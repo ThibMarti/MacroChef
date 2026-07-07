@@ -87,18 +87,22 @@ test:
 production:
   primary: &primary_production
     <<: *default
+    url: <%= ENV["DATABASE_URL"] %>
     database: macro_chef_production
     username: macro_chef
     password: <%= ENV["MACRO_CHEF_DATABASE_PASSWORD"] %>
   cache:
     <<: *primary_production
+    url: <%= ENV["DATABASE_URL"] %>
     database: macro_chef_production_cache
     migrations_paths: db/cache_migrate
   queue:
     <<: *primary_production
+    url: <%= ENV["DATABASE_URL"] %>
     database: macro_chef_production_queue
     migrations_paths: db/queue_migrate
   cable:
     <<: *primary_production
+    url: <%= ENV["DATABASE_URL"] %>
     database: macro_chef_production_cable
     migrations_paths: db/cable_migrate
