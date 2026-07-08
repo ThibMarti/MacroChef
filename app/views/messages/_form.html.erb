@@ -1,0 +1,9 @@
+<%= simple_form_for [chat, message] do |f| %>
+  <%= f.input :content,
+              as: :text,
+              label: "Ask a follow-up question",
+              placeholder: "Example: Can you replace breakfast with something without oats?",
+              input_html: { rows: 3 } %>
+
+  <%= f.button :submit, "Send", class: "btn btn-primary" %>
+<% end %>
