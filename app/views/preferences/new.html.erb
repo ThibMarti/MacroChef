@@ -1,0 +1,18 @@
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-12 col-md-8 col-lg-6">
+      <h1>Create your MacroChef plan</h1>
+      <p>Tell MacroChef your goals, calories, macros, diet and allergies.</p>
+
+      <%= simple_form_for @preference do |f| %>
+        <%= f.input :content,
+                    as: :text,
+                    label: "Your preferences",
+                    placeholder: "Example: I want 2800 kcal, high protein, no peanuts, 4 meals per day, easy recipes.",
+                    input_html: { rows: 8 } %>
+
+        <%= f.button :submit, "Generate my meal plan", class: "btn btn-primary" %>
+      <% end %>
+    </div>
+  </div>
+</div>
