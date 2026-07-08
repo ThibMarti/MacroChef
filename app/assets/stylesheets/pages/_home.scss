@@ -1,1 +1,277 @@
 // Specific CSS for your home-page
+//
+// Variables locales à la landing page (maquette Figma MacroChef).
+// Scopées ici volontairement pour ne pas toucher aux variables globales
+// partagées avec le reste de l'équipe (config/_colors.scss, bootstrap_variables).
+$mc-emerald:      #1D9E75;
+$mc-emerald-dark: #0F6E56;
+$mc-mint:         #E1F5EE;
+$mc-cream:        #F5F4EF;
+$mc-charcoal:     #1A1A18;
+$mc-gray-text:    #5F5E5A;
+
+.landing {
+  background-color: $mc-cream;
+  color: $mc-charcoal;
+}
+
+// --- Navbar ---
+.landing-navbar {
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+  background-color: transparent;
+
+  // Safety net for very narrow phones (~320-360px): let the logo + buttons
+  // wrap onto a second line instead of overflowing horizontally.
+  .container {
+    flex-wrap: wrap;
+    row-gap: 0.75rem;
+  }
+}
+
+.landing-logo {
+  font-family: $headers-font;
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: $mc-charcoal;
+  text-decoration: none;
+
+  &:hover {
+    color: $mc-emerald-dark;
+  }
+}
+
+.landing-nav-link {
+  color: $mc-gray-text;
+  text-decoration: none;
+  font-weight: 600;
+
+  &:hover {
+    color: $mc-charcoal;
+  }
+}
+
+// --- Boutons de la landing ---
+.landing-btn-primary {
+  background-color: $mc-emerald;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  padding: 0.6rem 1.4rem;
+
+  &:hover {
+    background-color: $mc-emerald-dark;
+    color: white;
+  }
+}
+
+.landing-btn-secondary {
+  background-color: white;
+  color: $mc-charcoal;
+  border: 1px solid rgba(black, 0.1);
+  border-radius: 8px;
+  font-weight: 600;
+  padding: 0.6rem 1.4rem;
+
+  &:hover {
+    background-color: $mc-mint;
+  }
+}
+
+.landing-btn-ghost {
+  background-color: transparent;
+  color: $mc-charcoal;
+  border: none;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 0.85rem;
+
+  &:hover {
+    color: $mc-emerald-dark;
+  }
+}
+
+// --- Hero ---
+.landing-hero {
+  padding: 5rem 0 6rem;
+
+  @media (max-width: 576px) {
+    padding: 3rem 0 3.5rem;
+  }
+}
+
+.landing-hero-title {
+  font-family: $headers-font;
+  font-weight: 700;
+  // clamp(min, preferred, max): scales fluidly with viewport width instead
+  // of jumping abruptly at a breakpoint — stays readable from a small phone
+  // up to a wide desktop.
+  font-size: clamp(1.9rem, 6vw, 2.75rem);
+  max-width: 750px;
+  margin: 0 auto 1.5rem;
+  line-height: 1.15;
+}
+
+.landing-highlight {
+  color: $mc-emerald;
+}
+
+.landing-hero-subtitle {
+  color: $mc-gray-text;
+  max-width: 600px;
+  margin: 0 auto 2.5rem;
+  font-size: 1.1rem;
+}
+
+// --- Features ---
+.landing-features {
+  background-color: white;
+  padding: 4rem 0 5rem;
+  border-top: 1px solid rgba(black, 0.08);
+
+  @media (max-width: 576px) {
+    padding: 3rem 0 3.5rem;
+  }
+}
+
+.landing-spacer {
+  background-color: $mc-cream;
+  height: 4rem;
+
+  @media (max-width: 576px) {
+    height: 2.5rem;
+  }
+}
+
+.landing-section-title {
+  font-family: $headers-font;
+  font-weight: 700;
+  font-size: clamp(1.5rem, 4.5vw, 2rem);
+  margin-bottom: 3rem;
+}
+
+.landing-feature-card {
+  text-align: center;
+  padding: 1.5rem;
+}
+
+.landing-feature-number {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: $mc-emerald;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: $headers-font;
+  font-weight: 700;
+  margin: 0 auto 1.25rem;
+}
+
+.landing-feature-title {
+  font-family: $headers-font;
+  font-weight: 700;
+  font-size: 1.15rem;
+  margin-bottom: 0.5rem;
+}
+
+.landing-feature-text {
+  color: $mc-gray-text;
+  font-size: 0.95rem;
+}
+
+// --- Reviews ---
+.landing-reviews {
+  background-color: white;
+  padding: 4rem 0 5rem;
+
+  @media (max-width: 576px) {
+    padding: 3rem 0 3.5rem;
+  }
+}
+
+.landing-eyebrow {
+  color: $mc-gray-text;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+
+.landing-review-card {
+  background-color: $mc-cream;
+  border-radius: 12px;
+  padding: 1.75rem;
+  height: 100%;
+}
+
+.landing-review-text {
+  color: $mc-charcoal;
+  font-size: 0.95rem;
+  margin-bottom: 1.5rem;
+}
+
+.landing-review-author {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.landing-review-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: $mc-mint;
+  color: $mc-emerald-dark;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.landing-review-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+// --- Final CTA ---
+.landing-cta {
+  background-color: $mc-emerald;
+  padding: 5rem 0;
+
+  @media (max-width: 576px) {
+    padding: 3.5rem 0;
+  }
+}
+
+.landing-cta-title {
+  font-family: $headers-font;
+  font-weight: 700;
+  font-size: clamp(1.4rem, 5vw, 1.9rem);
+  color: white;
+  margin-bottom: 0.75rem;
+}
+
+.landing-cta-text {
+  color: rgba(white, 0.9);
+  margin-bottom: 2rem;
+}
+
+.landing-btn-cta {
+  background-color: white;
+  color: $mc-charcoal;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  padding: 0.7rem 1.6rem;
+
+  &:hover {
+    background-color: $mc-mint;
+    color: $mc-charcoal;
+  }
+}
