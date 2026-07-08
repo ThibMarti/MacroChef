@@ -1,0 +1,12 @@
+<div class="container mt-5">
+  <h1>MacroChef Chat</h1>
+
+  <% @chat.messages.each do |message| %>
+    <div class="mb-3">
+      <strong><%= message.role.capitalize %></strong>
+      <div class="border rounded p-3">
+        <%= simple_format(message.content) %>
+      </div>
+    </div>
+  <% end %>
+</div>
