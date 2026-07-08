@@ -3,7 +3,10 @@
     <div class="container d-flex justify-content-between align-items-center">
       <%= link_to "MacroChef", root_path, class: "landing-logo" %>
 
-      <%= link_to "Get Started", "#", class: "btn landing-btn-primary" %>
+      <div class="d-flex align-items-center gap-2">
+        <%= link_to "Login", "#", class: "btn landing-btn-ghost" %>
+        <%= link_to "Get Started", "#", class: "btn landing-btn-primary" %>
+      </div>
     </div>
   </nav>
 
@@ -46,6 +49,8 @@
     </div>
   </section>
 
+  <div class="landing-spacer"></div>
+
   <% landing_reviews = [
        { initials: "LM", name: "Lucas M.", text: "Lost 6kg on my cut without ever feeling like I was on a diet. The variety is what keeps me going." },
        { initials: "SK", name: "Sarah K.", text: "Finally a plan that respects my lactose intolerance. Saves me hours of planning every Sunday." },
@@ -80,6 +85,4 @@
       <%= link_to "Sign up free", "#", class: "btn landing-btn-cta" %>
     </div>
   </section>
-
-  <%# Footer coming next %>
 </div>
