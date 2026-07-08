@@ -1,12 +1,129 @@
 <div class="container mt-5">
+  <%= link_to "← Back to MacroChef", root_path, class: "d-inline-block mb-3" %>
+
   <h1>MacroChef Chat</h1>
 
   <% @chat.messages.each do |message| %>
-    <div class="mb-3">
-      <strong><%= message.role.capitalize %></strong>
-      <div class="border rounded p-3">
-        <%= simple_format(message.content) %>
+    <% plan = meal_plan_payload(message) %>
+
+    <% if plan %>
+      <% profile = plan["profile"] %>
+
+      <div class="mb-4">
+        <h2 class="h5 mb-3">Your Meal Plan</h2>
+
+        <div class="row row-cols-2 row-cols-md-4 g-2 mb-3">
+          <div class="col">
+            <div class="border rounded p-2 text-center">
+              <strong><%= profile["target_kcal"] %></strong><br>
+              <small class="text-muted">kcal/day</small>
+            </div>
+          </div>
+          <div class="col">
+            <div class="border rounded p-2 text-center">
+              <strong><%= profile["protein_g"] %>g</strong><br>
+              <small class="text-muted">Protein</small>
+            </div>
+          </div>
+          <div class="col">
+            <div class="border rounded p-2 text-center">
+              <strong><%= profile["carbs_g"] %>g</strong><br>
+              <small class="text-muted">Carbs</small>
+            </div>
+          </div>
+          <div class="col">
+            <div class="border rounded p-2 text-center">
+              <strong><%= profile["fat_g"] %>g</strong><br>
+              <small class="text-muted">Fat</small>
+            </div>
+          </div>
+        </div>
+
+        <p class="mb-3">
+          <span class="badge bg-secondary text-capitalize"><%= profile["diet_type"] %></span>
+          <span class="badge bg-secondary text-capitalize"><%= profile["goal"].to_s.tr("_", " ") %></span>
+          <% Array(profile["allergies"]).each do |allergy| %>
+            <span class="badge bg-danger-subtle text-danger-emphasis"><%= allergy %>-free</span>
+          <% end %>
+        </p>
+
+        <% if profile["assumptions"].present? %>
+          <div class="alert alert-info small">
+            <strong>Assumptions made:</strong>
+            <ul class="mb-0">
+              <% profile["assumptions"].each do |assumption| %>
+                <li><%= assumption %></li>
+              <% end %>
+            </ul>
+          </div>
+        <% end %>
+
+        <div class="accordion" id="plan-accordion-<%= message.id %>">
+          <% plan["week"].each_with_index do |day, index| %>
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button
+                  class="accordion-button <%= "collapsed" unless index.zero? %>"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#day-<%= message.id %>-<%= index %>"
+                >
+                  <%= day["day"] %>
+                </button>
+              </h2>
+              <div
+                id="day-<%= message.id %>-<%= index %>"
+                class="accordion-collapse collapse <%= "show" if index.zero? %>"
+                data-bs-parent="#plan-accordion-<%= message.id %>"
+              >
+                <div class="accordion-body">
+                  <% totals = day_totals(day) %>
+                  <p class="small text-muted mb-3">
+                    Day total: <strong><%= totals[:kcal] %> kcal</strong>
+                    · P<%= totals[:protein_g] %>g
+                    · C<%= totals[:carbs_g] %>g
+                    · F<%= totals[:fat_g] %>g
+                  </p>
+
+                  <% day["meals"].each do |meal| %>
+                    <div class="mb-3 pb-3 border-bottom">
+                      <div class="d-flex justify-content-between align-items-start flex-wrap gap-1">
+                        <div>
+                          <span class="badge bg-light text-dark text-uppercase"><%= meal["meal_type"] %></span>
+                          <strong class="ms-1"><%= meal["name"] %></strong>
+                        </div>
+                        <small class="text-muted text-nowrap">
+                          <%= meal["kcal"] %> kcal · P<%= meal["protein_g"] %> C<%= meal["carbs_g"] %> F<%= meal["fat_g"] %>
+                        </small>
+                      </div>
+
+                      <ul class="small mb-1 mt-2">
+                        <% Array(meal["ingredients"]).each do |ingredient| %>
+                          <li><%= ingredient["quantity"] %><%= ingredient["unit"] %> <%= ingredient["name"] %></li>
+                        <% end %>
+                      </ul>
+
+                      <ol class="small mb-0 ps-3">
+                        <% Array(meal["steps"]).each do |step| %>
+                          <li><%= step %></li>
+                        <% end %>
+                      </ol>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
       </div>
-    </div>
+
+    <% else %>
+      <div class="mb-3">
+        <strong><%= message.role.capitalize %></strong>
+        <div class="border rounded p-3">
+          <%= simple_format(message.content) %>
+        </div>
+      </div>
+    <% end %>
   <% end %>
 </div>
