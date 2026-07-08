@@ -10,3 +10,14 @@
 .navbar-lewagon .navbar-brand img {
   width: 40px;
 }
+
+.mc-logo {
+  font-family: $headers-font;
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: $mc-charcoal;
+
+  &:hover {
+    color: $mc-emerald-dark;
+  }
+}
