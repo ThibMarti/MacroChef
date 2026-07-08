@@ -1,26 +1,11 @@
 <div class="container mt-5">
-  <h1>MacroChef Chat</h1>
+  <h1 id="chat_title">MacroChef Chat</h1>
 
   <div id="messages">
-    <% @chat.messages.each do |message| %>
-      <div class="mb-3">
-        <strong><%= message.role.capitalize %></strong>
-        <div class="border rounded p-3">
-          <%= simple_format(message.content) %>
-        </div>
-      </div>
-    <% end %>
+    <%= render "messages/messages", messages: @chat.messages %>
   </div>
 
-  <div class="mt-4">
-    <%= simple_form_for [@chat, @message] do |f| %>
-      <%= f.input :content,
-                  as: :text,
-                  label: "Ask a follow-up question",
-                  placeholder: "Example: Can you replace the oatmeal with eggs?",
-                  input_html: { rows: 4 } %>
-
-      <%= f.button :submit, "Send", class: "btn btn-primary" %>
-    <% end %>
+  <div id="new_message_container">
+    <%= render "messages/form", chat: @chat, message: @message %>
   </div>
 </div>
