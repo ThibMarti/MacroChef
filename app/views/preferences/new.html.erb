@@ -1,17 +1,88 @@
 <div class="container mt-5">
   <div class="row justify-content-center">
-    <div class="col-12 col-md-8 col-lg-6">
-      <h1>Create your MacroChef plan</h1>
-      <p>Tell MacroChef your goals, calories, macros, diet and allergies.</p>
+    <div class="col-12 col-md-9 col-lg-7">
+      <h1 class="mb-1">Create your MacroChef plan</h1>
+      <p class="text-muted mb-4">
+        Tell us about yourself — we'll calculate your daily calorie target and build a
+        full week of meals around it.
+      </p>
 
-      <%= simple_form_for @preference do |f| %>
-        <%= f.input :content,
-                    as: :text,
-                    label: "Your preferences",
-                    placeholder: "Example: I want 2800 kcal, high protein, no peanuts, 4 meals per day, easy recipes.",
-                    input_html: { rows: 8 } %>
+      <%= form_with url: preferences_path, method: :post, local: true do %>
+        <h2 class="h5">1. About you</h2>
 
-        <%= f.button :submit, "Generate my meal plan", class: "btn btn-primary" %>
+        <label class="form-label d-block">Gender</label>
+        <div class="btn-group w-100 mb-3" role="group">
+          <input type="radio" class="btn-check" name="preference[gender]" id="gender_female" value="female" checked>
+          <label class="btn btn-outline-primary" for="gender_female">Female</label>
+
+          <input type="radio" class="btn-check" name="preference[gender]" id="gender_male" value="male">
+          <label class="btn btn-outline-primary" for="gender_male">Male</label>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-6">
+            <label class="form-label" for="weight_kg">Weight (kg)</label>
+            <input type="number" step="0.1" min="0" class="form-control" name="preference[weight_kg]" id="weight_kg" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label" for="body_fat_percent">Body fat (%)</label>
+            <input type="number" step="0.1" min="0" max="70" class="form-control" name="preference[body_fat_percent]" id="body_fat_percent" required>
+          </div>
+        </div>
+
+        <h2 class="h5 mt-4">2. Daily activity</h2>
+
+        <div class="mb-3">
+          <label class="form-label" for="steps_per_day">Steps per day</label>
+          <input type="number" step="1" min="0" class="form-control" name="preference[steps_per_day]" id="steps_per_day" value="1000">
+        </div>
+
+        <h2 class="h5 mt-4">3. Training</h2>
+
+        <div class="row g-3 mb-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label" for="training_type">Training type</label>
+            <select class="form-select" name="preference[training_type]" id="training_type">
+              <option value="none">No training</option>
+              <option value="walking">Walking</option>
+              <option value="running">Running</option>
+              <option value="cycling">Cycling</option>
+              <option value="weightlifting">Weightlifting</option>
+              <option value="swimming">Swimming</option>
+              <option value="hiit">HIIT</option>
+            </select>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label" for="training_minutes">Minutes/session</label>
+            <input type="number" step="1" min="0" class="form-control" name="preference[training_minutes]" id="training_minutes" value="0">
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label" for="training_days_per_week">Days/week</label>
+            <input type="number" step="1" min="0" max="7" class="form-control" name="preference[training_days_per_week]" id="training_days_per_week" value="0">
+          </div>
+        </div>
+
+        <h2 class="h5 mt-4">4. Your goal</h2>
+
+        <div class="btn-group w-100 mb-4" role="group">
+          <input type="radio" class="btn-check" name="preference[goal]" id="goal_lose" value="lose">
+          <label class="btn btn-outline-primary" for="goal_lose">Lose weight</label>
+
+          <input type="radio" class="btn-check" name="preference[goal]" id="goal_maintain" value="maintain" checked>
+          <label class="btn btn-outline-primary" for="goal_maintain">Maintain</label>
+
+          <input type="radio" class="btn-check" name="preference[goal]" id="goal_gain" value="gain">
+          <label class="btn btn-outline-primary" for="goal_gain">Gain weight</label>
+        </div>
+
+        <h2 class="h5 mt-4">5. Anything else?</h2>
+        <div class="mb-4">
+          <label class="form-label" for="extra_notes">Diet type, allergies, meals per day, preferences...</label>
+          <textarea class="form-control" name="preference[extra_notes]" id="extra_notes" rows="4"
+                    placeholder="Example: vegetarian, no peanuts, 4 meals per day, easy recipes."></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Generate my meal plan</button>
       <% end %>
     </div>
   </div>
