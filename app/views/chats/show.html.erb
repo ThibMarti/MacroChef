@@ -97,9 +97,14 @@
                         </small>
                       </div>
 
-                      <ul class="small mb-1 mt-2">
+                      <ul class="small mb-1 mt-2 list-unstyled">
                         <% Array(meal["ingredients"]).each do |ingredient| %>
-                          <li><%= ingredient["quantity"] %><%= ingredient["unit"] %> <%= ingredient["name"] %></li>
+                          <li class="d-flex justify-content-between gap-2">
+                            <span>• <%= ingredient["quantity"] %><%= ingredient["unit"] %> <%= ingredient["name"] %></span>
+                            <span class="text-muted text-nowrap">
+                              <%= ingredient["kcal"] %> kcal · P<%= ingredient["protein_g"] %> C<%= ingredient["carbs_g"] %> F<%= ingredient["fat_g"] %>
+                            </span>
+                          </li>
                         <% end %>
                       </ul>
 
