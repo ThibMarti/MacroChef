@@ -1,0 +1,21 @@
+<div class="container mt-5">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <h1 class="h3 mb-0">Your Meal Plans</h1>
+    <%= link_to "New Meal Plan", new_preference_path, class: "btn btn-primary" %>
+  </div>
+
+  <% if @chats.any? %>
+    <div class="list-group">
+      <% @chats.each do |chat| %>
+        <%= link_to chat_path(chat), class: "list-group-item list-group-item-action" do %>
+          <div class="d-flex justify-content-between align-items-center gap-3">
+            <span><%= truncate(chat.preference.content, length: 80) %></span>
+            <small class="text-muted text-nowrap"><%= chat.created_at.strftime("%b %d, %Y") %></small>
+          </div>
+        <% end %>
+      <% end %>
+    </div>
+  <% else %>
+    <p class="text-muted">You haven't created a meal plan yet — click "New Meal Plan" to get started.</p>
+  <% end %>
+</div>
