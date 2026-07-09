@@ -1,10 +1,16 @@
 // Force white text on the brand-colored primary button. Bootstrap picks the
-// text color automatically via color-contrast($primary), which resolved to
-// black against our emerald green — override it explicitly to match the
-// landing page's buttons (green background, white text).
+// text color automatically via color-contrast($primary), which can resolve
+// to black against our accent blue depending on shade — override it
+// explicitly so it's always white.
 .btn-primary {
   --bs-btn-color: #fff;
   --bs-btn-hover-color: #fff;
   --bs-btn-active-color: #fff;
   --bs-btn-disabled-color: #fff;
+}
+
+// MacroFactor look: every button/toggle is fully pill-shaped.
+.btn {
+  border-radius: var(--radius-pill);
+  font-weight: 600;
 }

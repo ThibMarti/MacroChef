@@ -1,0 +1,106 @@
+// Thin colored macro progress bars ("label + bar + X / Y g") and the meal
+// list row layout (icon, title, macros, edit action).
+
+.macro-row {
+  margin-bottom: 0.85rem;
+}
+
+.macro-row-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.8rem;
+  margin-bottom: 0.3rem;
+}
+
+.macro-row-label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.macro-row-value {
+  color: var(--text-secondary);
+}
+
+.macro-bar-track {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background-color: var(--border);
+  overflow: hidden;
+}
+
+.macro-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background-color: var(--accent);
+
+  &.protein { background-color: var(--protein); }
+  &.fat     { background-color: var(--fat); }
+  &.carbs   { background-color: var(--carbs); }
+}
+
+.macro-row-label .dot,
+.macro-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background-color: var(--accent);
+  margin-right: 0.4rem;
+
+  &.protein { background-color: var(--protein); }
+  &.fat     { background-color: var(--fat); }
+  &.carbs   { background-color: var(--carbs); }
+}
+
+// --- Meal row (used in the meal plan / chat view) ---
+.meal-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--border);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.meal-row-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background-color: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 1.1rem;
+}
+
+.meal-row-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.meal-row-type {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.meal-row-title {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.meal-row-macros {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.meal-row-action {
+  flex-shrink: 0;
+}
