@@ -10,7 +10,7 @@
       <ul class="navbar-nav me-auto">
         <% if user_signed_in? %>
           <li class="nav-item active">
-            <%= link_to "My meal plans", root_path, class: "nav-link" %>
+            <%= link_to "My meal plans", chats_path, class: "nav-link" %>
           </li>
           <li class="nav-item">
             <%= link_to "New Meal Plan", new_preference_path, class: "nav-link" %>

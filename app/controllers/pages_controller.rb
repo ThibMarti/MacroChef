@@ -2,6 +2,9 @@ class PagesController < ApplicationController
   skip_before_action :authenticate_user!, only: :home
 
   def home
-    @chats = current_user.chats.order(created_at: :desc) if user_signed_in?
+    if user_signed_in?
+      @chats = current_user.chats.includes(:messages).order(created_at: :desc).to_a
+      @recent_chats = @chats.first(3)
+    end
   end
 end
