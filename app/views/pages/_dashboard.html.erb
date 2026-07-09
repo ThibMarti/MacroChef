@@ -1,0 +1,66 @@
+<div class="landing">
+  <nav class="navbar navbar-expand-lg landing-navbar">
+    <div class="container d-flex justify-content-between align-items-center">
+      <%= link_to "MacroChef", root_path, class: "landing-logo" %>
+
+      <div class="d-flex align-items-center gap-2">
+        <%= link_to "New Meal Plan", new_preference_path, class: "btn landing-btn-primary" %>
+      </div>
+    </div>
+  </nav>
+
+  <section class="landing-hero">
+    <div class="container text-center">
+      <h1 class="landing-hero-title">
+        Welcome back, <span class="landing-highlight"><%= current_user.email %></span>
+      </h1>
+      <p class="landing-hero-subtitle">
+        <% if @chats.present? %>
+          You've created <%= pluralize(@chats.count, "meal plan") %> so far. Ready for another?
+        <% else %>
+          You haven't created a meal plan yet &mdash; let's build your first one.
+        <% end %>
+      </p>
+      <div class="d-flex justify-content-center flex-wrap gap-3">
+        <%= link_to "New Meal Plan", new_preference_path, class: "btn landing-btn-primary btn-lg" %>
+      </div>
+    </div>
+  </section>
+
+  <section class="landing-features">
+    <div class="container">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="landing-section-title mb-0">My Meal Plans</h2>
+        <%= link_to "View all", chats_path, class: "btn landing-btn-secondary" %>
+      </div>
+
+      <% if @recent_chats.present? %>
+        <div class="row g-4">
+          <% @recent_chats.each do |chat| %>
+            <% profile = meal_plan_profile(chat) %>
+
+            <div class="col-md-6 col-lg-4">
+              <%= link_to chat_path(chat), class: "text-decoration-none text-reset d-block h-100" do %>
+                <div class="landing-review-card h-100">
+                  <p class="landing-eyebrow mb-2"><%= chat.created_at.strftime("%B %-d, %Y") %></p>
+
+                  <% if profile %>
+                    <p class="mb-2">
+                      <span class="badge bg-secondary text-capitalize"><%= profile["diet_type"] %></span>
+                      <span class="badge bg-secondary text-capitalize"><%= profile["goal"].to_s.tr("_", " ") %></span>
+                    </p>
+                    <p class="mb-0"><strong><%= profile["target_kcal"] %></strong> kcal/day</p>
+                  <% else %>
+                    <p class="mb-0 text-muted">Meal plan pending&hellip;</p>
+                  <% end %>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="text-center text-muted mb-0">No meal plans yet &mdash; create your first one above.</p>
+      <% end %>
+    </div>
+  </section>
+</div>

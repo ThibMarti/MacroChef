@@ -9,7 +9,7 @@ Rails.application.routes.draw do
   get "meal_plans", to: "meal_plans#index", as: :meal_plans
   resources :preferences, only: [:new, :create]
 
-  resources :chats, only: [:show] do
+  resources :chats, only: [:index, :show] do
     resources :messages, only: [:create]
   end
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.

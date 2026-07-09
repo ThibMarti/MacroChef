@@ -12,6 +12,14 @@ module ChatsHelper
     nil
   end
 
+  # Finds the profile (target_kcal, diet_type, goal, ...) for a chat's meal
+  # plan, used for summary cards where the full week isn't shown. Returns nil
+  # if the chat has no assistant message with a valid plan yet.
+  def meal_plan_profile(chat)
+    message = chat.messages.find { |m| meal_plan_payload(m) }
+    meal_plan_payload(message)["profile"] if message
+  end
+
   # Sums kcal/protein/carbs/fat across a day's meals. Computed here from the
   # actual meal data (not trusted from the LLM's own totals), so it's always
   # accurate — useful to spot-check whether the day really matches the
