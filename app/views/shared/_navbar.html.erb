@@ -1,6 +1,6 @@
 <nav class="navbar navbar-expand-sm navbar-light navbar-lewagon">
   <div class="container-fluid">
-    <%= link_to "MacroChef", "http://localhost:3000", class: "navbar-brand mc-logo" %>
+    <%= link_to "MacroChef", root_path, class: "navbar-brand mc-logo" %>
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
@@ -31,6 +31,11 @@
           </li>
         <% end %>
       </ul>
+
+      <div class="theme-toggle" data-controller="theme">
+        <button type="button" class="theme-toggle-option" data-theme-target="option" data-action="theme#set" data-theme-mode-param="light" aria-label="Light mode">☀</button>
+        <button type="button" class="theme-toggle-option" data-theme-target="option" data-action="theme#set" data-theme-mode-param="dark" aria-label="Dark mode">☾</button>
+      </div>
     </div>
   </div>
 </nav>

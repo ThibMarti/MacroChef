@@ -1,7 +1,7 @@
 <div class="container mt-5">
   <%= link_to "← Back to MacroChef", root_path, class: "d-inline-block mb-3" %>
   <%= turbo_stream_from @chat %>
-  <h1>MacroChef Chat</h1>
+  <h1 class="mc-heading mb-4">MacroChef Chat</h1>
 
   <% @chat.messages.each do |message| %>
     <% plan = meal_plan_payload(message) %>
@@ -10,31 +10,25 @@
       <% profile = plan["profile"] %>
 
       <div class="mb-4">
-        <h2 class="h5 mb-3">Your Meal Plan</h2>
+        <h2 class="mc-heading h6 mb-3">Your Meal Plan</h2>
 
-        <div class="row row-cols-2 row-cols-md-4 g-2 mb-3">
-          <div class="col">
-            <div class="border rounded p-2 text-center">
-              <strong><%= profile["target_kcal"] %></strong><br>
-              <small class="text-muted">kcal/day</small>
+        <div class="mc-surface p-4 mb-3">
+          <div class="row row-cols-2 row-cols-md-4 g-3 text-center">
+            <div class="col">
+              <div class="stat-value"><%= profile["target_kcal"] %></div>
+              <div class="stat-label">kcal / day</div>
             </div>
-          </div>
-          <div class="col">
-            <div class="border rounded p-2 text-center">
-              <strong><%= profile["protein_g"] %>g</strong><br>
-              <small class="text-muted">Protein</small>
+            <div class="col">
+              <div class="stat-value"><%= profile["protein_g"] %>g</div>
+              <div class="stat-label"><span class="macro-dot protein"></span>Protein</div>
             </div>
-          </div>
-          <div class="col">
-            <div class="border rounded p-2 text-center">
-              <strong><%= profile["carbs_g"] %>g</strong><br>
-              <small class="text-muted">Carbs</small>
+            <div class="col">
+              <div class="stat-value"><%= profile["carbs_g"] %>g</div>
+              <div class="stat-label"><span class="macro-dot carbs"></span>Carbs</div>
             </div>
-          </div>
-          <div class="col">
-            <div class="border rounded p-2 text-center">
-              <strong><%= profile["fat_g"] %>g</strong><br>
-              <small class="text-muted">Fat</small>
+            <div class="col">
+              <div class="stat-value"><%= profile["fat_g"] %>g</div>
+              <div class="stat-label"><span class="macro-dot fat"></span>Fat</div>
             </div>
           </div>
         </div>
@@ -60,7 +54,11 @@
 
         <div class="accordion" id="plan-accordion-<%= message.id %>">
           <% plan["week"].each_with_index do |day, index| %>
-            <div class="accordion-item">
+            <% totals = day_totals(day) %>
+            <% target_kcal = profile["target_kcal"].to_f %>
+            <% pct = target_kcal.positive? ? [totals[:kcal] / target_kcal, 1.0].min : 0 %>
+
+            <div class="accordion-item mc-surface mb-2">
               <h2 class="accordion-header">
                 <button
                   class="accordion-button <%= "collapsed" unless index.zero? %>"
@@ -68,7 +66,7 @@
                   data-bs-toggle="collapse"
                   data-bs-target="#day-<%= message.id %>-<%= index %>"
                 >
-                  <%= day["day"] %>
+                  <span class="mc-heading"><%= day["day"] %></span>
                 </button>
               </h2>
               <div
@@ -77,42 +75,65 @@
                 data-bs-parent="#plan-accordion-<%= message.id %>"
               >
                 <div class="accordion-body">
-                  <% totals = day_totals(day) %>
-                  <p class="small text-muted mb-3">
-                    Day total: <strong><%= totals[:kcal] %> kcal</strong>
-                    · P<%= totals[:protein_g] %>g
-                    · C<%= totals[:carbs_g] %>g
-                    · F<%= totals[:fat_g] %>g
-                  </p>
+                  <div class="row g-4 align-items-center mb-4">
+                    <div class="col-auto">
+                      <div class="calorie-ring" style="--pct: <%= pct %>">
+                        <div class="calorie-ring-value">
+                          <div class="stat-value"><%= totals[:kcal] %></div>
+                          <div class="stat-label">/ <%= profile["target_kcal"] %> kcal</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col">
+                      <% [
+                           ["Protein", :protein_g, profile["protein_g"], "protein"],
+                           ["Carbs",   :carbs_g,   profile["carbs_g"],   "carbs"],
+                           ["Fat",     :fat_g,     profile["fat_g"],     "fat"]
+                         ].each do |label, key, target, modifier| %>
+                        <% target = target.to_f %>
+                        <% ratio = target.positive? ? [(totals[key] / target) * 100, 100].min : 0 %>
+                        <div class="macro-row">
+                          <div class="macro-row-header">
+                            <span class="macro-row-label"><span class="macro-dot <%= modifier %>"></span><%= label %></span>
+                            <span class="macro-row-value"><%= totals[key] %> / <%= target.to_i %> g</span>
+                          </div>
+                          <div class="macro-bar-track">
+                            <div class="macro-bar-fill <%= modifier %>" style="width: <%= ratio %>%"></div>
+                          </div>
+                        </div>
+                      <% end %>
+                    </div>
+                  </div>
 
                   <% day["meals"].each do |meal| %>
-                    <div class="mb-3 pb-3 border-bottom">
-                      <div class="d-flex justify-content-between align-items-start flex-wrap gap-1">
-                        <div>
-                          <span class="badge bg-light text-dark text-uppercase"><%= meal["meal_type"] %></span>
-                          <strong class="ms-1"><%= meal["name"] %></strong>
-                        </div>
-                        <small class="text-muted text-nowrap">
-                          <%= meal["kcal"] %> kcal · P<%= meal["protein_g"] %> C<%= meal["carbs_g"] %> F<%= meal["fat_g"] %>
-                        </small>
+                    <div class="meal-row">
+                      <div class="meal-row-icon">
+                        <%= { "breakfast" => "🍳", "lunch" => "🥗", "dinner" => "🍽", "snack" => "🍎" }.fetch(meal["meal_type"], "🍴") %>
                       </div>
+                      <div class="meal-row-body">
+                        <div class="meal-row-type"><%= meal["meal_type"] %></div>
+                        <div class="meal-row-title"><%= meal["name"] %></div>
+                        <div class="meal-row-macros">
+                          <%= meal["kcal"] %> kcal · P<%= meal["protein_g"] %> C<%= meal["carbs_g"] %> F<%= meal["fat_g"] %>
+                        </div>
 
-                      <ul class="small mb-1 mt-2 list-unstyled">
-                        <% Array(meal["ingredients"]).each do |ingredient| %>
-                          <li class="d-flex justify-content-between gap-2">
-                            <span>• <%= ingredient["quantity"] %><%= ingredient["unit"] %> <%= ingredient["name"] %></span>
-                            <span class="text-muted text-nowrap">
-                              <%= ingredient["kcal"] %> kcal · P<%= ingredient["protein_g"] %> C<%= ingredient["carbs_g"] %> F<%= ingredient["fat_g"] %>
-                            </span>
-                          </li>
-                        <% end %>
-                      </ul>
+                        <ul class="small mb-1 mt-2 list-unstyled">
+                          <% Array(meal["ingredients"]).each do |ingredient| %>
+                            <li class="d-flex justify-content-between gap-2">
+                              <span class="text-secondary-mc">• <%= ingredient["quantity"] %><%= ingredient["unit"] %> <%= ingredient["name"] %></span>
+                              <span class="text-secondary-mc text-nowrap">
+                                <%= ingredient["kcal"] %> kcal · P<%= ingredient["protein_g"] %> C<%= ingredient["carbs_g"] %> F<%= ingredient["fat_g"] %>
+                              </span>
+                            </li>
+                          <% end %>
+                        </ul>
 
-                      <ol class="small mb-0 ps-3">
-                        <% Array(meal["steps"]).each do |step| %>
-                          <li><%= step %></li>
-                        <% end %>
-                      </ol>
+                        <ol class="small mb-0 ps-3 text-secondary-mc">
+                          <% Array(meal["steps"]).each do |step| %>
+                            <li><%= step %></li>
+                          <% end %>
+                        </ol>
+                      </div>
                     </div>
                   <% end %>
                 </div>
@@ -125,7 +146,7 @@
     <% else %>
       <div class="mb-3">
         <strong><%= message.role.capitalize %></strong>
-        <div class="border rounded p-3">
+        <div class="mc-surface p-3">
           <%= simple_format(message.content) %>
         </div>
       </div>

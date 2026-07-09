@@ -2,6 +2,7 @@
 @import "config/fonts";
 @import "config/colors";
 @import "config/bootstrap_variables";
+@import "config/theme";
 
 // External libraries
 @import "bootstrap";
@@ -10,3 +11,8 @@
 // Your CSS partials
 @import "components/index";
 @import "pages/index";
+
+// Must be imported LAST: overrides Bootstrap's statically-compiled colors
+// with the live theme custom properties so light/dark actually work.
+// See that file's header comment for why the import order matters.
+@import "components/base";

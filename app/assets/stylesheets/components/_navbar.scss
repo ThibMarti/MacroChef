@@ -1,6 +1,7 @@
 .navbar-lewagon {
   justify-content: space-between;
-  background: white;
+  background-color: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
 .navbar-lewagon .navbar-collapse {
@@ -11,13 +12,22 @@
   width: 40px;
 }
 
+.navbar-lewagon .nav-link {
+  color: var(--text-secondary);
+  font-weight: 600;
+
+  &:hover {
+    color: var(--text-primary);
+  }
+}
+
 .mc-logo {
   font-family: $headers-font;
   font-weight: 700;
   font-size: 1.25rem;
-  color: $mc-charcoal;
+  color: var(--text-primary);
 
   &:hover {
-    color: $mc-emerald-dark;
+    color: var(--brand);
   }
 }

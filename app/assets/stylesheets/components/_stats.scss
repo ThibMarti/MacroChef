@@ -1,0 +1,66 @@
+// Big-number stats, the circular calorie progress ring, and small round
+// icon action buttons — MacroFactor-style dashboard/meal-plan primitives.
+
+.stat-value {
+  font-family: $headers-font;
+  font-weight: 700;
+  font-size: 1.75rem;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.stat-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 0.35rem;
+}
+
+// Usage: <div class="calorie-ring" style="--pct: 0.65">…</div> where --pct
+// is consumed/target clamped to [0, 1].
+.calorie-ring {
+  --pct: 0;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: conic-gradient(var(--accent) calc(var(--pct) * 360deg), var(--border) 0deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin: 0 auto;
+}
+
+.calorie-ring::before {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  border-radius: 50%;
+  background-color: var(--surface);
+}
+
+.calorie-ring-value {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+
+.icon-btn-round {
+  width: 2.25rem;
+  height: 2.25rem;
+  min-width: 2.25rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background-color: var(--surface);
+  color: var(--text-secondary);
+
+  &:hover {
+    background-color: var(--bg);
+    color: var(--text-primary);
+  }
+}
