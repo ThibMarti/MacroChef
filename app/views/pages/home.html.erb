@@ -1,92 +1,113 @@
-<%# TODO: Login/Get Started/Sign up links point to localhost:3001 (the chat feature's
-      separate branch/worktree) for local testing only. Replace with the real Devise/preferences
-      route helpers (new_user_session_path, new_user_registration_path, new_preference_path) once
-      feature/improve-system-prompt (or rubyllm) is merged into this branch. %>
-<div class="landing">
-  <nav class="navbar navbar-expand-lg landing-navbar">
-    <div class="container d-flex justify-content-between align-items-center">
-      <%= link_to "MacroChef", root_path, class: "landing-logo" %>
-
-      <div class="d-flex align-items-center gap-2">
-        <%= link_to "Login", "http://localhost:3001/users/sign_in", class: "btn landing-btn-ghost" %>
-        <%= link_to "Get Started", "http://localhost:3001/users/sign_up", class: "btn landing-btn-primary" %>
-      </div>
+<% if user_signed_in? %>
+  <div class="container mt-5">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+      <h1 class="h3 mb-0">Your Meal Plans</h1>
+      <%= link_to "New Meal Plan", new_preference_path, class: "btn btn-primary" %>
     </div>
-  </nav>
 
-  <section class="landing-hero">
-    <div class="container text-center">
-      <h1 class="landing-hero-title">
-        A meal plan built for you, <span class="landing-highlight">week after week</span>
-      </h1>
-      <p class="landing-hero-subtitle">
-        Enter your calories, macros, and diet type: MacroChef generates your weekly meal
-        plan, tailored to your weight loss or muscle gain goal.
-      </p>
-      <div class="d-flex justify-content-center flex-wrap gap-3">
-        <%= link_to "Get Started for Free", "http://localhost:3001/users/sign_up", class: "btn landing-btn-primary btn-lg" %>
-      </div>
-    </div>
-  </section>
-
-  <% landing_features = [
-       { number: "01", title: "Set your goals", text: "Enter your daily calories, macros, and diet type — keto, vegan, balanced, or anything in between." },
-       { number: "02", title: "Get your plan", text: "MacroChef instantly builds a full week of meals that match your targets." },
-       { number: "03", title: "Track your progress", text: "See exactly how each meal fits your budget, and adjust your goals anytime." }
-     ] %>
-
-  <section class="landing-features" id="features">
-    <div class="container">
-      <h2 class="landing-section-title text-center">How MacroChef Works</h2>
-
-      <div class="row g-4">
-        <% landing_features.each do |feature| %>
-          <div class="col-md-6 col-lg-4">
-            <div class="landing-feature-card">
-              <div class="landing-feature-number"><%= feature[:number] %></div>
-              <h3 class="landing-feature-title"><%= feature[:title] %></h3>
-              <p class="landing-feature-text"><%= feature[:text] %></p>
+    <% if @chats.any? %>
+      <div class="list-group">
+        <% @chats.each do |chat| %>
+          <%= link_to chat_path(chat), class: "list-group-item list-group-item-action" do %>
+            <div class="d-flex justify-content-between align-items-center gap-3">
+              <span><%= truncate(chat.preference.content, length: 80) %></span>
+              <small class="text-muted text-nowrap"><%= chat.created_at.strftime("%b %d, %Y") %></small>
             </div>
-          </div>
+          <% end %>
         <% end %>
       </div>
-    </div>
-  </section>
+    <% else %>
+      <p class="text-muted">You haven't created a meal plan yet — click "New Meal Plan" to get started.</p>
+    <% end %>
+  </div>
 
-  <div class="landing-spacer"></div>
+<% else %>
+  <div class="landing">
+    <nav class="navbar navbar-expand-lg landing-navbar">
+      <div class="container d-flex justify-content-between align-items-center">
+        <%= link_to "MacroChef", root_path, class: "landing-logo" %>
 
-  <% landing_reviews = [
-       { initials: "LM", name: "Lucas M.", text: "Lost 6kg on my cut without ever feeling like I was on a diet. The variety is what keeps me going." },
-       { initials: "SK", name: "Sarah K.", text: "Finally a plan that respects my lactose intolerance. Saves me hours of planning every Sunday." },
-       { initials: "TD", name: "Tom D.",   text: "Bulking used to mean guessing. Now I hit my protein every day and the recipes are actually good." }
-     ] %>
+        <div class="d-flex align-items-center gap-2">
+          <%= link_to "Login", new_user_session_path, class: "btn landing-btn-ghost" %>
+          <%= link_to "Get Started", new_user_registration_path, class: "btn landing-btn-primary" %>
+        </div>
+      </div>
+    </nav>
 
-  <section class="landing-reviews">
-    <div class="container">
-      <p class="landing-eyebrow text-center">Reviews</p>
-      <h2 class="landing-section-title text-center">People are hitting their goals</h2>
+    <section class="landing-hero">
+      <div class="container text-center">
+        <h1 class="landing-hero-title">
+          A meal plan built for you, <span class="landing-highlight">week after week</span>
+        </h1>
+        <p class="landing-hero-subtitle">
+          Enter your calories, macros, and diet type: MacroChef generates your weekly meal
+          plan, tailored to your weight loss or muscle gain goal.
+        </p>
+        <div class="d-flex justify-content-center flex-wrap gap-3">
+          <%= link_to "Get Started for Free", new_user_registration_path, class: "btn landing-btn-primary btn-lg" %>
+        </div>
+      </div>
+    </section>
 
-      <div class="row g-4">
-        <% landing_reviews.each do |review| %>
-          <div class="col-md-4">
-            <div class="landing-review-card">
-              <p class="landing-review-text">"<%= review[:text] %>"</p>
-              <div class="landing-review-author">
-                <span class="landing-review-avatar"><%= review[:initials] %></span>
-                <span class="landing-review-name"><%= review[:name] %></span>
+    <% landing_features = [
+         { number: "01", title: "Set your goals", text: "Enter your daily calories, macros, and diet type — keto, vegan, balanced, or anything in between." },
+         { number: "02", title: "Get your plan", text: "MacroChef instantly builds a full week of meals that match your targets." },
+         { number: "03", title: "Track your progress", text: "See exactly how each meal fits your budget, and adjust your goals anytime." }
+       ] %>
+
+    <section class="landing-features" id="features">
+      <div class="container">
+        <h2 class="landing-section-title text-center">How MacroChef Works</h2>
+
+        <div class="row g-4">
+          <% landing_features.each do |feature| %>
+            <div class="col-md-6 col-lg-4">
+              <div class="landing-feature-card">
+                <div class="landing-feature-number"><%= feature[:number] %></div>
+                <h3 class="landing-feature-title"><%= feature[:title] %></h3>
+                <p class="landing-feature-text"><%= feature[:text] %></p>
               </div>
             </div>
-          </div>
-        <% end %>
+          <% end %>
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <section class="landing-cta">
-    <div class="container text-center">
-      <h2 class="landing-cta-title">Ready to eat for your goals?</h2>
-      <p class="landing-cta-text">Get your first weekly meal plan in minutes. Free to start.</p>
-      <%= link_to "Sign up free", "http://localhost:3001/users/sign_up", class: "btn landing-btn-cta" %>
-    </div>
-  </section>
-</div>
+    <div class="landing-spacer"></div>
+
+    <% landing_reviews = [
+         { initials: "LM", name: "Lucas M.", text: "Lost 6kg on my cut without ever feeling like I was on a diet. The variety is what keeps me going." },
+         { initials: "SK", name: "Sarah K.", text: "Finally a plan that respects my lactose intolerance. Saves me hours of planning every Sunday." },
+         { initials: "TD", name: "Tom D.",   text: "Bulking used to mean guessing. Now I hit my protein every day and the recipes are actually good." }
+       ] %>
+
+    <section class="landing-reviews">
+      <div class="container">
+        <p class="landing-eyebrow text-center">Reviews</p>
+        <h2 class="landing-section-title text-center">People are hitting their goals</h2>
+
+        <div class="row g-4">
+          <% landing_reviews.each do |review| %>
+            <div class="col-md-4">
+              <div class="landing-review-card">
+                <p class="landing-review-text">"<%= review[:text] %>"</p>
+                <div class="landing-review-author">
+                  <span class="landing-review-avatar"><%= review[:initials] %></span>
+                  <span class="landing-review-name"><%= review[:name] %></span>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </section>
+
+    <section class="landing-cta">
+      <div class="container text-center">
+        <h2 class="landing-cta-title">Ready to eat for your goals?</h2>
+        <p class="landing-cta-text">Get your first weekly meal plan in minutes. Free to start.</p>
+        <%= link_to "Sign up free", new_user_registration_path, class: "btn landing-btn-cta" %>
+      </div>
+    </section>
+  </div>
+<% end %>
