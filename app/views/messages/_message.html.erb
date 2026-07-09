@@ -4,6 +4,12 @@
       <%= simple_format(message.content) %>
     </div>
   </div>
+<% elsif message.role == "assistant" %>
+  <div class="d-flex justify-content-start mb-5" id="<%= dom_id(message) %>">
+    <div class="px-3 pb-0 pt-3">
+      <%= message.content.present? ? raw(render_markdown(message.content)) : "Generating..." %>
+    </div>
+  </div>
 <% else %>
   <div class="d-flex justify-content-start mb-3">
     <div class="border rounded p-3">
