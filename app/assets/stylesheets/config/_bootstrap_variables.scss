@@ -7,22 +7,23 @@
 // General style
 $font-family-sans-serif: $body-font;
 $headings-font-family:   $headers-font;
-$body-bg:                $light-gray;
+$body-bg:                $mc-bg;
 $font-size-base:         1rem;
 
 // Colors
-$body-color: $gray;
-$primary:    $mc-emerald;
+$body-color: $mc-text-primary;
+$primary:    $mc-brand;
 $success:    $green;
 $info:       $yellow;
 $danger:     $red;
 $warning:    $orange;
 
-// Buttons & inputs' radius
-$border-radius-sm:            .0625rem;
-$border-radius:               .125rem;
-$border-radius-lg:            .25rem;
-$border-radius-xl:            .5rem;
-$border-radius-xxl:           1rem;
+// Buttons & inputs' radius — MacroFactor look uses generously rounded cards
+// (16-20px) and fully pill-shaped buttons/toggles (see components/_buttons.scss).
+$border-radius-sm:            .75rem;
+$border-radius:               1rem;
+$border-radius-lg:            1.25rem;
+$border-radius-xl:            1.5rem;
+$border-radius-xxl:           2rem;
 
 // Override other variables below!

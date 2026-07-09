@@ -9,6 +9,17 @@
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
 
+    <script>
+      // Applied synchronously, before CSS/paint, to avoid a flash of the
+      // wrong theme. Mirrors the fallback logic in theme_controller.js.
+      // Light is always the default unless the user explicitly toggled to
+      // dark before (we don't follow the OS preference).
+      (function () {
+        var theme = localStorage.getItem("macrochef-theme") || "light";
+        document.documentElement.setAttribute("data-theme", theme);
+      })();
+    </script>
+
     <%= yield :head %>
 
     <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.rb too!) %>

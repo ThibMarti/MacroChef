@@ -1,0 +1,98 @@
+// Runtime theming. Bootstrap compiles $body-bg/$body-color/$input-bg/etc.
+// into static hex values at build time — they can't react to the
+// [data-theme="dark"] toggle. This file re-applies the live CSS custom
+// properties on top of Bootstrap's output so light/dark actually switches
+// at runtime. MUST be imported LAST in application.scss (after "bootstrap"
+// and every other component) so these rules win cascade ties against
+// Bootstrap's equal-or-higher-specificity selectors.
+
+body {
+  background-color: var(--bg);
+  color: var(--text-primary);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+a {
+  color: var(--brand);
+}
+
+.mc-heading {
+  font-family: $headers-font;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mc-surface {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+
+.text-secondary-mc {
+  color: var(--text-secondary);
+}
+
+// Form controls: Bootstrap bakes $input-bg/$input-color from $body-bg/
+// $body-color at compile time, so they'd otherwise stay light forever.
+.form-control,
+.form-select,
+textarea.form-control {
+  background-color: var(--surface);
+  color: var(--text-primary);
+  border-color: var(--border);
+
+  &:focus {
+    background-color: var(--surface);
+    color: var(--text-primary);
+  }
+}
+
+.form-control::placeholder {
+  color: var(--text-secondary);
+  opacity: 1;
+}
+
+.form-label {
+  color: var(--text-primary);
+}
+
+// Accordion (day-by-day meal plan): same static-color issue as form controls.
+.accordion-item {
+  background-color: var(--surface);
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+.accordion-button {
+  background-color: var(--surface);
+  color: var(--text-primary);
+
+  &:not(.collapsed) {
+    background-color: var(--surface);
+    color: var(--text-primary);
+    box-shadow: none;
+  }
+}
+
+[data-theme="dark"] .accordion-button::after {
+  // Bootstrap's chevron is an inline SVG with a hardcoded dark stroke —
+  // invert it so it stays visible on a dark background.
+  filter: invert(1) grayscale(1) brightness(1.6);
+}
+
+// Dropdown menu (navbar user menu).
+.dropdown-menu {
+  background-color: var(--surface);
+  border-color: var(--border);
+}
+
+.dropdown-item {
+  color: var(--text-primary);
+
+  &:hover,
+  &:focus {
+    background-color: var(--bg);
+    color: var(--text-primary);
+  }
+}
