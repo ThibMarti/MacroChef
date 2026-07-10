@@ -10,7 +10,20 @@ Rails.application.routes.draw do
   resources :preferences, only: [:new, :create]
 
   resources :chats, only: [:index, :show] do
-    resources :messages, only: [:create]
+    resources :messages, only: [:create] do
+      member do
+        patch :swap_meal
+        patch :update_ingredient
+        post :add_ingredient
+        delete :remove_ingredient
+      end
+    end
+  end
+
+  resources :recipes, only: [:index, :new, :create, :show, :edit, :update] do
+    member do
+      post :toggle_favorite
+    end
   end
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.

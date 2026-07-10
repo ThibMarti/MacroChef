@@ -1,0 +1,53 @@
+<div class="container mt-5">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <h1 class="mc-heading h4 mb-0">Recipes</h1>
+
+    <div class="d-flex align-items-center gap-2">
+      <div class="pill-toggle" style="width: auto;">
+        <%= link_to "All", recipes_path, class: "pill-toggle-label #{"active" unless @favorites_only}" %>
+        <%= link_to "♥", recipes_path(favorites: true), class: "pill-toggle-label #{"active" if @favorites_only}" %>
+      </div>
+      <%= link_to "+ New recipe", new_recipe_path, class: "btn btn-sm btn-primary" %>
+    </div>
+  </div>
+
+  <% if @favorites_only && @recipes.empty? %>
+    <p class="text-secondary-mc">You haven't favorited any recipes yet — click the ♡ on a recipe to add it here.</p>
+  <% end %>
+
+  <% %w[main breakfast snack].each do |category| %>
+    <% recipes = @recipes.select { |r| r.category == category } %>
+    <% next if recipes.empty? %>
+
+    <h2 class="mc-heading h6 mb-3 mt-4"><%= category == "main" ? "Lunch & Dinner" : category.capitalize %></h2>
+
+    <div class="row g-4 mb-3">
+      <% recipes.each do |recipe| %>
+        <div class="col-6 col-md-4 col-lg-3">
+          <div class="mc-surface h-100 overflow-hidden position-relative">
+            <%= form_with url: toggle_favorite_recipe_path(recipe), method: :post, class: "position-absolute m-2 top-0 end-0" do %>
+              <button type="submit" class="icon-btn-round border-0" aria-label="Toggle favorite">
+                <%= @favorite_recipe_ids.include?(recipe.id) ? "♥" : "♡" %>
+              </button>
+            <% end %>
+
+            <%= link_to recipe, class: "text-decoration-none text-reset" do %>
+              <% if recipe.photo.attached? %>
+                <%= image_tag recipe.photo.variant(resize_to_fill: [400, 260]), class: "w-100", style: "aspect-ratio: 16/10; object-fit: cover;" %>
+              <% else %>
+                <div class="d-flex align-items-center justify-content-center text-secondary-mc" style="aspect-ratio: 16/10; background-color: var(--bg); font-size: 2rem;">
+                  <%= { "breakfast" => "🍳", "main" => "🍽", "snack" => "🍎" }.fetch(recipe.category, "🍴") %>
+                </div>
+              <% end %>
+
+              <div class="p-3">
+                <div class="fw-bold text-truncate"><%= recipe.name %></div>
+                <div class="text-secondary-mc small"><%= recipe.total_kcal.to_i %> kcal · P<%= recipe.total_protein_g.to_i %> C<%= recipe.total_carbs_g.to_i %> F<%= recipe.total_fat_g.to_i %></div>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+</div>

@@ -33,3 +33,10 @@
   background-color: var(--accent);
   color: white;
 }
+
+// Link-based variant (e.g. a GET filter toggle) where "active" is set from
+// the controller/params rather than driven by a radio input's :checked state.
+.pill-toggle-label.active {
+  background-color: var(--accent);
+  color: white;
+}
