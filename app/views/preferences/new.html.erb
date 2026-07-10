@@ -7,7 +7,7 @@
         full week of meals around it.
       </p>
 
-      <%= form_with url: preferences_path, method: :post, local: true do %>
+      <%= form_with url: preferences_path, method: :post, data: { turbo: false } do %>
         <div class="mc-surface p-4 mb-3">
           <h2 class="mc-heading h6 mb-3">1. About you</h2>
 

@@ -5,15 +5,42 @@ class PreferencesController < ApplicationController
     @preference = Preference.new
   end
 
+  # Step 1: compute target_kcal and a default macro split from body data,
+  # then show the user those exact numbers (editable) to confirm or adjust
+  # before we spend an LLM call generating the actual plan.
   def create
-    @preference = Preference.new(content: build_content_from_calculator(calculator_params))
+    p = calculator_params
+    @target_kcal = compute_target_kcal(p)
+    lean_mass = p[:weight_kg].to_f * (1 - p[:body_fat_percent].to_f / 100.0)
+
+    default_macros = default_macro_split(@target_kcal, p[:weight_kg].to_f, lean_mass)
+    @protein_g = default_macros[:protein_g]
+    @carbs_g = default_macros[:carbs_g]
+    @fat_g = default_macros[:fat_g]
+
+    @calculator_params = p
+  end
+
+  # Step 2: the user has confirmed (or edited) protein_g/carbs_g/fat_g on the
+  # previous screen, then we actually generate the plan via the LLM.
+  # target_kcal is always re-derived from those three grams here in Ruby
+  # (protein_g*4 + carbs_g*4 + fat_g*9) rather than trusted from the client
+  # — the confirm page's live kcal display is JS convenience only.
+  def generate
+    p = calculator_params
+    protein_g = params[:protein_g].to_i
+    carbs_g = params[:carbs_g].to_i
+    fat_g = params[:fat_g].to_i
+    target_kcal = (protein_g * 4) + (carbs_g * 4) + (fat_g * 9)
+
+    @preference = Preference.new(content: build_content(p, target_kcal, protein_g, carbs_g, fat_g))
     @preference.user = current_user
 
     if @preference.save
       @chat = Chat.create!(user: current_user, preference: @preference)
 
       user_prompt = @preference.content
-      favorite_recipe_ids = calculator_params[:only_favorites] == "1" ? current_user.favorite_recipes.ids : nil
+      favorite_recipe_ids = p[:only_favorites] == "1" ? current_user.favorite_recipes.ids : nil
 
       ruby_llm_chat = RubyLLM.chat(model: "gpt-4o-mini")
 
@@ -26,7 +53,7 @@ class PreferencesController < ApplicationController
 
       redirect_to chat_path(@chat)
     else
-      render :new, status: :unprocessable_entity
+      redirect_to new_preference_path, alert: @preference.errors.full_messages.to_sentence
     end
   end
 
@@ -61,11 +88,9 @@ class PreferencesController < ApplicationController
   # Computes a daily calorie target from body data (Katch-McArdle formula,
   # chosen because we collect body fat % — more accurate than age/height-based
   # formulas like Mifflin-St Jeor when body fat is known) plus activity from
-  # daily steps and training, then formats everything into a plain-text
-  # description for the LLM. Deliberately does NOT persist these fields as
-  # separate Preference columns (no migration needed) — only the final
-  # formatted text goes into the existing `content` column.
-  def build_content_from_calculator(p)
+  # daily steps and training. Deliberately does NOT persist these fields as
+  # separate Preference columns (no migration needed).
+  def compute_target_kcal(p)
     weight = p[:weight_kg].to_f
     body_fat = p[:body_fat_percent].to_f
     steps = p[:steps_per_day].to_i
@@ -84,23 +109,32 @@ class PreferencesController < ApplicationController
     training_kcal_daily_avg = (training_kcal_per_session * training_days) / 7.0
 
     tdee = bmr + steps_kcal + training_kcal_daily_avg
-    target_kcal = (tdee * GOAL_MULTIPLIER.fetch(goal, 1.0)).round
+    (tdee * GOAL_MULTIPLIER.fetch(goal, 1.0)).round
+  end
 
-    # Macro split, computed in Ruby rather than left for the LLM to guess:
-    # ~2g protein per kg of lean (fat-free) mass, ~1g fat per kg of total
-    # bodyweight, and carbs fill whatever's left of the calorie target.
+  # Default macro split shown (as editable percentages) on the confirm step:
+  # ~2g protein per kg of lean (fat-free) mass, ~1g fat per kg of total
+  # bodyweight, and carbs fill whatever's left of the calorie target. The
+  # user can override the resulting percentages before generation.
+  def default_macro_split(target_kcal, weight, lean_mass)
     protein_g = (2 * lean_mass).round
     fat_g = weight.round
     carbs_kcal = target_kcal - (protein_g * 4) - (fat_g * 9)
     carbs_g = [(carbs_kcal / 4.0).round, 0].max
 
+    { protein_g: protein_g, carbs_g: carbs_g, fat_g: fat_g }
+  end
+
+  # Formats the final (possibly user-edited) target/macros plus the rest of
+  # the calculator inputs into the plain-text description sent to the LLM.
+  def build_content(p, target_kcal, protein_g, carbs_g, fat_g)
     <<~TEXT
       Target: #{target_kcal} kcal/day (already calculated from body data — use this exact number, do not recalculate it).
       Macros: #{protein_g}g protein, #{carbs_g}g carbs, #{fat_g}g fat (already calculated from body data — use
       these exact numbers, do not recalculate them, unless the notes below explicitly override them).
-      Gender: #{p[:gender]}. Weight: #{weight}kg. Body fat: #{body_fat}%.
-      Daily steps: #{steps}. Training: #{training_type}, #{training_minutes} min/session, #{training_days} sessions/week.
-      Goal: #{goal}.
+      Gender: #{p[:gender]}. Weight: #{p[:weight_kg]}kg. Body fat: #{p[:body_fat_percent]}%.
+      Daily steps: #{p[:steps_per_day]}. Training: #{p[:training_type].presence || "none"}, #{p[:training_minutes]} min/session, #{p[:training_days_per_week]} sessions/week.
+      Goal: #{p[:goal].presence || "maintain"}.
       #{p[:extra_notes].presence}
     TEXT
   end
@@ -133,10 +167,15 @@ class PreferencesController < ApplicationController
     target_kcal = parsed.dig("profile", "target_kcal").to_f
     target_kcal = 2000.0 if target_kcal <= 0
 
+    # Built once and reused for every meal in the plan — see the comment on
+    # MealPlanMacros.allocate_day! for why this matters.
+    recipe_by_name = Recipe.includes(:recipe_ingredients).index_by(&:name)
+    favorites_catalog_cache = {}
+
     parsed["week"].each do |day|
       meals = Array(day["meals"])
-      enforce_favorites!(meals, favorite_recipe_ids) if favorite_recipe_ids.present?
-      MealPlanMacros.allocate_day!(meals, target_kcal) if meals.any?
+      enforce_favorites!(meals, favorite_recipe_ids, favorites_catalog_cache) if favorite_recipe_ids.present?
+      MealPlanMacros.allocate_day!(meals, target_kcal, recipe_by_name) if meals.any?
     end
 
     JSON.generate(parsed)
@@ -148,9 +187,11 @@ class PreferencesController < ApplicationController
   # meal_type) with one that is, picked from the same restricted catalog the
   # LLM was given — guarantees the "only use my favorites" option is always
   # honored regardless of whether the LLM actually followed the instruction.
-  def enforce_favorites!(meals, favorite_recipe_ids)
+  # `cache` memoizes the (at most 3) per-meal_type catalogs across the whole
+  # week instead of rebuilding them for every single meal.
+  def enforce_favorites!(meals, favorite_recipe_ids, cache = {})
     meals.each do |meal|
-      allowed = catalog_for_meal_type(meal["meal_type"], favorite_recipe_ids)
+      allowed = cache[meal["meal_type"]] ||= catalog_for_meal_type(meal["meal_type"], favorite_recipe_ids)
       next if allowed.any? { |dish| dish[:name] == meal["name"] }
 
       replacement = allowed.sample
@@ -272,7 +313,7 @@ class PreferencesController < ApplicationController
           "allergies": ["gluten"],
           "meals_per_day": 4,
           "goal": "weight_loss",
-          "assumptions": ["Macros not specified, split 30/40/30 from target_kcal."]
+          "assumptions": ["Diet type not specified, assumed omnivore."]
         },
         "week": [
           {

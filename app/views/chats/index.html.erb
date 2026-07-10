@@ -1,36 +1,6 @@
 <div class="container mt-5">
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="mc-heading h4 mb-0">My Meal Plans</h1>
-    <%= link_to "New Meal Plan", new_preference_path, class: "btn landing-btn-primary" %>
-  </div>
+  <h1 class="mc-heading h4 mb-4">Meal Plan</h1>
 
-  <% if @chats.present? %>
-    <div class="row g-4">
-      <% @chats.each do |chat| %>
-        <% profile = meal_plan_profile(chat) %>
-
-        <div class="col-md-6 col-lg-4">
-          <%= link_to chat_path(chat), class: "text-decoration-none text-reset d-block h-100" do %>
-            <div class="landing-review-card h-100">
-              <p class="landing-eyebrow mb-2"><%= chat.created_at.strftime("%B %-d, %Y") %></p>
-
-              <% if profile %>
-                <p class="mb-2">
-                  <span class="badge bg-secondary text-capitalize"><%= profile["diet_type"] %></span>
-                  <span class="badge bg-secondary text-capitalize"><%= profile["goal"].to_s.tr("_", " ") %></span>
-                </p>
-                <div class="stat-value"><%= profile["target_kcal"] %></div>
-                <div class="stat-label">kcal / day</div>
-              <% else %>
-                <p class="mb-0 text-secondary-mc">Meal plan pending&hellip;</p>
-              <% end %>
-            </div>
-          <% end %>
-        </div>
-      <% end %>
-    </div>
-  <% else %>
-    <p class="text-secondary-mc">You haven't created a meal plan yet.</p>
-    <%= link_to "Create your first meal plan", new_preference_path, class: "btn landing-btn-primary" %>
-  <% end %>
+  <p class="text-secondary-mc">You haven't created a meal plan yet.</p>
+  <%= link_to "Create your first meal plan", new_preference_path, class: "btn landing-btn-primary" %>
 </div>
