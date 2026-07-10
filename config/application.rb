@@ -29,5 +29,10 @@ module MacroChef
     #
     # config.time_zone = "Central Time (US & Canada)"
     # config.eager_load_paths << Rails.root.join("extras")
+
+    # Rails 8 defaults to :vips for Active Storage image variants (recipe
+    # photos), but libvips isn't installed on every dev machine — mini_magick
+    # (backed by the ImageMagick CLI) is more commonly already available.
+    config.active_storage.variant_processor = :mini_magick
   end
 end

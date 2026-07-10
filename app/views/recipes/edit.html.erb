@@ -1,0 +1,55 @@
+<div class="container mt-5">
+  <%= link_to "← Back to Recipe", recipe_path(@recipe), class: "d-inline-block mb-3 text-secondary-mc" %>
+
+  <h1 class="mc-heading h4 mb-4">Edit Recipe</h1>
+
+  <%= simple_form_for @recipe, html: { multipart: true } do |f| %>
+    <div class="mc-surface p-4 mb-3">
+      <%= f.input :name, label: "Name" %>
+      <%= f.input :category, label: "Category", collection: Recipe::CATEGORIES,
+                  label_method: ->(c) { c == "main" ? "Lunch & Dinner" : c.capitalize },
+                  value_method: :itself %>
+
+      <label class="form-label d-block">Photo</label>
+      <% if @recipe.photo.attached? %>
+        <%= image_tag @recipe.photo.variant(resize_to_fill: [200, 150]), class: "mb-2 d-block", style: "object-fit: cover;" %>
+      <% end %>
+      <%= f.input :photo, as: :file, label: false %>
+    </div>
+
+    <div class="mc-surface p-4 mb-3">
+      <h2 class="mc-heading h6 mb-3">Ingredients</h2>
+
+      <%= f.simple_fields_for :recipe_ingredients do |i| %>
+        <div class="row g-2 align-items-end mb-3 pb-3 border-bottom" style="border-color: var(--border) !important;">
+          <div class="col-12 col-md-4">
+            <%= i.input :name, label: "Name", input_html: { class: "form-control-sm" } %>
+          </div>
+          <div class="col-6 col-md-2">
+            <%= i.input :quantity, label: "Quantity (g)", input_html: { class: "form-control-sm" } %>
+          </div>
+          <div class="col-6 col-md-1">
+            <%= i.input :kcal, label: "Kcal", input_html: { class: "form-control-sm" } %>
+          </div>
+          <div class="col-6 col-md-1">
+            <%= i.input :protein_g, label: "Prot", input_html: { class: "form-control-sm" } %>
+          </div>
+          <div class="col-6 col-md-1">
+            <%= i.input :carbs_g, label: "Carbs", input_html: { class: "form-control-sm" } %>
+          </div>
+          <div class="col-6 col-md-1">
+            <%= i.input :fat_g, label: "Fat", input_html: { class: "form-control-sm" } %>
+          </div>
+          <% if i.object.persisted? %>
+            <div class="col-12">
+              <%= i.input :_destroy, as: :boolean, label: "Remove this ingredient" %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+      <p class="text-secondary-mc small mb-0">Leave a row's name blank to skip it — three blank rows are provided to add new ingredients.</p>
+    </div>
+
+    <%= f.button :submit, "Save Recipe", class: "btn btn-primary btn-lg w-100" %>
+  <% end %>
+</div>

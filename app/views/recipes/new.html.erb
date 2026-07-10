@@ -1,0 +1,22 @@
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-12 col-md-8 col-lg-6">
+      <%= link_to "← Back to Recipes", recipes_path, class: "d-inline-block mb-3 text-secondary-mc" %>
+
+      <h1 class="mc-heading mb-1">Create a recipe</h1>
+      <p class="text-secondary-mc mb-4">
+        Describe the dish in a few words and MacroChef will build a full recipe — name,
+        ingredients, and macros — that you can review and adjust right after.
+      </p>
+
+      <div class="mc-surface p-4">
+        <%= form_with url: recipes_path, method: :post do %>
+          <label class="form-label" for="description">What do you want to cook?</label>
+          <textarea name="description" id="description" rows="3" class="form-control mb-3"
+                    placeholder="e.g. Sweet potato fries, fry sauce and salmon" required></textarea>
+          <button type="submit" class="btn btn-primary w-100">Generate recipe</button>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>

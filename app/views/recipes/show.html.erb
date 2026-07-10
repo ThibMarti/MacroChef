@@ -1,0 +1,64 @@
+<div class="container mt-5">
+  <%= link_to "← Back to Recipes", recipes_path, class: "d-inline-block mb-3 text-secondary-mc" %>
+
+  <div class="row g-4">
+    <div class="col-12 col-md-5">
+      <% if @recipe.photo.attached? %>
+        <%= image_tag @recipe.photo.variant(resize_to_fill: [600, 450]), class: "w-100 mc-surface", style: "object-fit: cover;" %>
+      <% else %>
+        <div class="d-flex align-items-center justify-content-center mc-surface text-secondary-mc" style="aspect-ratio: 4/3; font-size: 3rem;">
+          <%= { "breakfast" => "🍳", "main" => "🍽", "snack" => "🍎" }.fetch(@recipe.category, "🍴") %>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="col-12 col-md-7">
+      <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+        <h1 class="mc-heading h4 mb-0"><%= @recipe.name %></h1>
+
+        <%= form_with url: toggle_favorite_recipe_path(@recipe), method: :post do %>
+          <button type="submit" class="icon-btn-round border" aria-label="Toggle favorite">
+            <%= @is_favorite ? "♥" : "♡" %>
+          </button>
+        <% end %>
+      </div>
+
+      <span class="badge bg-secondary text-capitalize mb-3"><%= @recipe.category == "main" ? "Lunch & Dinner" : @recipe.category %></span>
+
+      <div class="mc-surface p-4 mb-3">
+        <div class="row row-cols-4 g-3 text-center">
+          <div class="col">
+            <div class="stat-value"><%= @recipe.total_kcal.to_i %></div>
+            <div class="stat-label">kcal</div>
+          </div>
+          <div class="col">
+            <div class="stat-value"><%= @recipe.total_protein_g.to_i %>g</div>
+            <div class="stat-label"><span class="macro-dot protein"></span>Protein</div>
+          </div>
+          <div class="col">
+            <div class="stat-value"><%= @recipe.total_carbs_g.to_i %>g</div>
+            <div class="stat-label"><span class="macro-dot carbs"></span>Carbs</div>
+          </div>
+          <div class="col">
+            <div class="stat-value"><%= @recipe.total_fat_g.to_i %>g</div>
+            <div class="stat-label"><span class="macro-dot fat"></span>Fat</div>
+          </div>
+        </div>
+      </div>
+
+      <h2 class="mc-heading h6 mb-2">Ingredients</h2>
+      <ul class="list-unstyled mb-3">
+        <% @recipe.recipe_ingredients.each do |ingredient| %>
+          <li class="d-flex justify-content-between gap-2 py-1 border-bottom" style="border-color: var(--border) !important;">
+            <span>• <%= ingredient.quantity.to_f %><%= ingredient.unit %> <%= ingredient.name %></span>
+            <span class="text-secondary-mc text-nowrap">
+              <%= ingredient.kcal.to_i %> kcal · P<%= ingredient.protein_g.to_i %> C<%= ingredient.carbs_g.to_i %> F<%= ingredient.fat_g.to_i %>
+            </span>
+          </li>
+        <% end %>
+      </ul>
+
+      <%= link_to "Edit recipe", edit_recipe_path(@recipe), class: "btn btn-primary" %>
+    </div>
+  </div>
+</div>

@@ -1,5 +1,5 @@
 <div class="container mt-5">
-  <%= link_to "← Back to MacroChef", root_path, class: "d-inline-block mb-3" %>
+  <%= link_to "← Back to MacroChef", root_path, class: "d-inline-block mb-3 text-secondary-mc" %>
   <%= turbo_stream_from @chat %>
   <h1 class="mc-heading mb-4">MacroChef Chat</h1>
 
@@ -58,10 +58,12 @@
             <% target_kcal = profile["target_kcal"].to_f %>
             <% pct = target_kcal.positive? ? [totals[:kcal] / target_kcal, 1.0].min : 0 %>
 
+            <% is_open_day = params[:open_day].present? && params[:open_day].to_i == index %>
+
             <div class="accordion-item mc-surface mb-2">
               <h2 class="accordion-header">
                 <button
-                  class="accordion-button <%= "collapsed" unless index.zero? %>"
+                  class="accordion-button <%= "collapsed" unless is_open_day %>"
                   type="button"
                   data-bs-toggle="collapse"
                   data-bs-target="#day-<%= message.id %>-<%= index %>"
@@ -71,7 +73,7 @@
               </h2>
               <div
                 id="day-<%= message.id %>-<%= index %>"
-                class="accordion-collapse collapse <%= "show" if index.zero? %>"
+                class="accordion-collapse collapse <%= "show" if is_open_day %>"
                 data-bs-parent="#plan-accordion-<%= message.id %>"
               >
                 <div class="accordion-body">
@@ -105,7 +107,8 @@
                     </div>
                   </div>
 
-                  <% day["meals"].each do |meal| %>
+                  <% day["meals"].each_with_index do |raw_meal, meal_index| %>
+                    <% meal = MealPlanMacros.live_macros(raw_meal) %>
                     <div class="meal-row">
                       <div class="meal-row-icon">
                         <%= { "breakfast" => "🍳", "lunch" => "🥗", "dinner" => "🍽", "snack" => "🍎" }.fetch(meal["meal_type"], "🍴") %>
@@ -117,16 +120,105 @@
                           <%= meal["kcal"] %> kcal · P<%= meal["protein_g"] %> C<%= meal["carbs_g"] %> F<%= meal["fat_g"] %>
                         </div>
 
+                        <% swap_modal_id = "swap-meal-#{message.id}-#{index}-#{meal_index}" %>
+                        <button type="button" class="btn btn-sm btn-outline-primary mt-2" data-bs-toggle="modal" data-bs-target="#<%= swap_modal_id %>">
+                          Swap
+                        </button>
+
+                        <div class="modal fade" id="<%= swap_modal_id %>" tabindex="-1" aria-hidden="true">
+                          <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                            <div class="modal-content mc-surface">
+                              <div class="modal-header">
+                                <h2 class="mc-heading h6 modal-title">Swap dish</h2>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                              </div>
+                              <div class="modal-body">
+                                <div class="row g-3">
+                                  <% recipes_for_meal_type(meal["meal_type"]).each do |recipe| %>
+                                    <div class="col-6 col-md-4">
+                                      <%= form_with url: swap_meal_chat_message_path(@chat, message, day_index: index, meal_index: meal_index),
+                                            method: :patch do %>
+                                        <input type="hidden" name="recipe_id" value="<%= recipe.id %>">
+                                        <button type="submit"
+                                                class="mc-surface w-100 h-100 p-0 border-0 text-start overflow-hidden"
+                                                style="cursor: pointer; color: var(--text-primary); <%= "outline: 2px solid var(--accent);" if recipe.name == meal["name"] %>">
+                                          <% if recipe.photo.attached? %>
+                                            <%= image_tag recipe.photo.variant(resize_to_fill: [300, 200]), class: "w-100", style: "aspect-ratio: 3/2; object-fit: cover;" %>
+                                          <% else %>
+                                            <div class="d-flex align-items-center justify-content-center text-secondary-mc" style="aspect-ratio: 3/2; background-color: var(--bg); font-size: 1.75rem;">
+                                              <%= { "breakfast" => "🍳", "main" => "🍽", "snack" => "🍎" }.fetch(recipe.category, "🍴") %>
+                                            </div>
+                                          <% end %>
+                                          <div class="p-2">
+                                            <div class="fw-bold small text-truncate"><%= recipe.name %></div>
+                                            <div class="text-secondary-mc" style="font-size: 0.7rem;"><%= recipe.total_kcal.to_i %> kcal</div>
+                                          </div>
+                                        </button>
+                                      <% end %>
+                                    </div>
+                                  <% end %>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
                         <ul class="small mb-1 mt-2 list-unstyled">
-                          <% Array(meal["ingredients"]).each do |ingredient| %>
-                            <li class="d-flex justify-content-between gap-2">
-                              <span class="text-secondary-mc">• <%= ingredient["quantity"] %><%= ingredient["unit"] %> <%= ingredient["name"] %></span>
-                              <span class="text-secondary-mc text-nowrap">
-                                <%= ingredient["kcal"] %> kcal · P<%= ingredient["protein_g"] %> C<%= ingredient["carbs_g"] %> F<%= ingredient["fat_g"] %>
+                          <% Array(meal["ingredients"]).each_with_index do |ingredient, ingredient_index| %>
+                            <li class="d-flex justify-content-between align-items-center gap-2">
+                              <span class="text-secondary-mc d-flex align-items-center gap-1">
+                                •
+                                <%= form_with url: update_ingredient_chat_message_path(@chat, message, day_index: index, meal_index: meal_index, ingredient_index: ingredient_index),
+                                      method: :patch, class: "d-inline-flex align-items-center gap-1" do %>
+                                  <input type="number" name="quantity" value="<%= ingredient["quantity"].to_i %>" min="0" step="1"
+                                         class="form-control form-control-sm" style="width: 4.5rem;"
+                                         onchange="this.form.requestSubmit()">
+                                  <span>g</span>
+                                <% end %>
+                                <%= ingredient["name"] %>
+                              </span>
+                              <span class="text-secondary-mc text-nowrap d-flex align-items-center gap-2">
+                                <%= ingredient["kcal"].to_i %> kcal · P<%= ingredient["protein_g"] %> C<%= ingredient["carbs_g"] %> F<%= ingredient["fat_g"] %>
+                                <%= form_with url: remove_ingredient_chat_message_path(@chat, message, day_index: index, meal_index: meal_index, ingredient_index: ingredient_index),
+                                      method: :delete, data: { turbo_confirm: "Remove #{ingredient["name"]}?" } do %>
+                                  <button type="submit" class="icon-btn-round p-0" style="width: 1.5rem; height: 1.5rem; min-width: 1.5rem; font-size: 0.9rem; line-height: 1;" aria-label="Remove ingredient">×</button>
+                                <% end %>
                               </span>
                             </li>
                           <% end %>
                         </ul>
+
+                        <% modal_id = "add-ingredient-#{message.id}-#{index}-#{meal_index}" %>
+                        <button type="button" class="btn btn-sm btn-outline-secondary mb-2" data-bs-toggle="modal" data-bs-target="#<%= modal_id %>">
+                          + Add ingredient
+                        </button>
+
+                        <div class="modal fade" id="<%= modal_id %>" tabindex="-1" aria-hidden="true">
+                          <div class="modal-dialog">
+                            <div class="modal-content mc-surface">
+                              <%= form_with url: add_ingredient_chat_message_path(@chat, message, day_index: index, meal_index: meal_index),
+                                    method: :post do %>
+                                <div class="modal-header">
+                                  <h2 class="mc-heading h6 modal-title">Add ingredient</h2>
+                                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body d-flex gap-2 align-items-center">
+                                  <select name="ingredient_name" class="form-select">
+                                    <% available_ingredient_names.each do |name| %>
+                                      <option value="<%= name %>"><%= name %></option>
+                                    <% end %>
+                                  </select>
+                                  <input type="number" name="quantity" value="50" min="1" step="1" class="form-control" style="width: 5.5rem;">
+                                  <span class="text-secondary-mc">g</span>
+                                </div>
+                                <div class="modal-footer">
+                                  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                                  <button type="submit" class="btn btn-primary">Add</button>
+                                </div>
+                              <% end %>
+                            </div>
+                          </div>
+                        </div>
 
                         <ol class="small mb-0 ps-3 text-secondary-mc">
                           <% Array(meal["steps"]).each do |step| %>
@@ -140,10 +232,32 @@
               </div>
             </div>
           <% end %>
+
+          <div class="accordion-item mc-surface mb-2">
+            <h2 class="accordion-header">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#shopping-list-<%= message.id %>">
+                <span class="mc-heading">🛒 Shopping List</span>
+              </button>
+            </h2>
+            <div id="shopping-list-<%= message.id %>" class="accordion-collapse collapse" data-bs-parent="#plan-accordion-<%= message.id %>">
+              <div class="accordion-body">
+                <% ShoppingList.grouped_for_chat(@chat).each do |category, items| %>
+                  <h3 class="mc-heading h6 mt-3 mb-2"><%= category %></h3>
+                  <ul class="list-unstyled mb-0">
+                    <% items.each do |item| %>
+                      <li class="py-1 border-bottom" style="border-color: var(--border) !important;">
+                        <%= item.label %>
+                      </li>
+                    <% end %>
+                  </ul>
+                <% end %>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-    <% else %>
+    <% elsif message.role != "user" %>
       <div class="mb-3">
         <strong><%= message.role.capitalize %></strong>
         <div class="mc-surface p-3">

@@ -13,15 +13,16 @@ class PreferencesController < ApplicationController
       @chat = Chat.create!(user: current_user, preference: @preference)
 
       user_prompt = @preference.content
+      favorite_recipe_ids = calculator_params[:only_favorites] == "1" ? current_user.favorite_recipes.ids : nil
 
       ruby_llm_chat = RubyLLM.chat(model: "gpt-4o-mini")
 
       response = ruby_llm_chat
-                 .with_instructions(system_prompt)
+                 .with_instructions(system_prompt(favorite_recipe_ids))
                  .ask(user_prompt)
 
       @chat.messages.create!(role: "user", content: user_prompt)
-      @chat.messages.create!(role: "assistant", content: recompute_macros(response.content))
+      @chat.messages.create!(role: "assistant", content: recompute_macros(response.content, favorite_recipe_ids))
 
       redirect_to chat_path(@chat)
     else
@@ -35,7 +36,7 @@ class PreferencesController < ApplicationController
     params.require(:preference).permit(
       :gender, :weight_kg, :body_fat_percent, :steps_per_day,
       :training_type, :training_minutes, :training_days_per_week,
-      :goal, :extra_notes
+      :goal, :extra_notes, :only_favorites
     )
   end
 
@@ -85,8 +86,18 @@ class PreferencesController < ApplicationController
     tdee = bmr + steps_kcal + training_kcal_daily_avg
     target_kcal = (tdee * GOAL_MULTIPLIER.fetch(goal, 1.0)).round
 
+    # Macro split, computed in Ruby rather than left for the LLM to guess:
+    # ~2g protein per kg of lean (fat-free) mass, ~1g fat per kg of total
+    # bodyweight, and carbs fill whatever's left of the calorie target.
+    protein_g = (2 * lean_mass).round
+    fat_g = weight.round
+    carbs_kcal = target_kcal - (protein_g * 4) - (fat_g * 9)
+    carbs_g = [(carbs_kcal / 4.0).round, 0].max
+
     <<~TEXT
       Target: #{target_kcal} kcal/day (already calculated from body data — use this exact number, do not recalculate it).
+      Macros: #{protein_g}g protein, #{carbs_g}g carbs, #{fat_g}g fat (already calculated from body data — use
+      these exact numbers, do not recalculate them, unless the notes below explicitly override them).
       Gender: #{p[:gender]}. Weight: #{weight}kg. Body fat: #{body_fat}%.
       Daily steps: #{steps}. Training: #{training_type}, #{training_minutes} min/session, #{training_days} sessions/week.
       Goal: #{goal}.
@@ -97,31 +108,25 @@ class PreferencesController < ApplicationController
   # Lunch/dinner, breakfast, and snack catalogs live in RecipeCatalog (shared
   # with SearchRecipesTool, which lets the LLM look them up during follow-up
   # chat) so the LLM is constrained to real, known dishes instead of inventing
-  # new ones.
-
-  # Rough share of the day's calories each meal_type should get, used to
-  # split target_kcal across a day's meals. Normalized per-day against
-  # whichever meal_types actually appear (see allocate_day_kcal!), so this
-  # doesn't need to sum to 1 and doesn't need every meal_type listed.
-  MEAL_TYPE_WEIGHT = {
-    "breakfast" => 0.25,
-    "lunch" => 0.35,
-    "dinner" => 0.30,
-    "snack" => 0.10
-  }.freeze
-  DEFAULT_MEAL_TYPE_WEIGHT = 0.20
+  # new ones. The actual macro math lives in MealPlanMacros (shared with
+  # MessagesController#swap_meal, which replaces one dish in an existing plan).
 
   # Parses the LLM's JSON response. The LLM only picks WHICH catalog dish
   # goes in each slot — it does not need to get the portion size or the
-  # macro arithmetic right. Ruby splits the day's target_kcal across that
-  # day's meals (by meal_type share) and derives each meal's serving_scale
-  # from base-catalog-macros so the day's kcal always lands on target by
-  # construction, then rescales that meal's invented ingredients
+  # macro arithmetic right. MealPlanMacros splits each day's target_kcal
+  # across that day's meals (by meal_type share) and derives each meal's
+  # serving_scale from base-catalog-macros so the day's kcal always lands on
+  # target by construction, then rescales that meal's invented ingredients
   # proportionally so they still sum to the corrected total. Falls back to
   # the LLM's own numbers for any meal whose dish name isn't found in the
   # catalog (should not happen given the prompt constraints, but never crash
   # meal-plan generation over it) or if the response isn't valid JSON at all.
-  def recompute_macros(raw_content)
+  #
+  # When favorite_recipe_ids is given, also enforces the "only favorites"
+  # restriction ourselves (see enforce_favorites!) rather than trusting the
+  # LLM to have honored it — small models sometimes pick a dish outside the
+  # given catalog anyway despite the prompt's hard constraint.
+  def recompute_macros(raw_content, favorite_recipe_ids = nil)
     parsed = JSON.parse(raw_content)
     return raw_content unless parsed.is_a?(Hash) && parsed["week"].is_a?(Array)
 
@@ -130,7 +135,8 @@ class PreferencesController < ApplicationController
 
     parsed["week"].each do |day|
       meals = Array(day["meals"])
-      allocate_day_kcal!(meals, target_kcal) if meals.any?
+      enforce_favorites!(meals, favorite_recipe_ids) if favorite_recipe_ids.present?
+      MealPlanMacros.allocate_day!(meals, target_kcal) if meals.any?
     end
 
     JSON.generate(parsed)
@@ -138,66 +144,38 @@ class PreferencesController < ApplicationController
     raw_content
   end
 
-  def allocate_day_kcal!(meals, target_kcal)
-    weights = meals.map { |meal| MEAL_TYPE_WEIGHT.fetch(meal["meal_type"], DEFAULT_MEAL_TYPE_WEIGHT) }
-    total_weight = weights.sum
-    return if total_weight <= 0
+  # Replaces any meal whose dish isn't in the user's favorites (for that
+  # meal_type) with one that is, picked from the same restricted catalog the
+  # LLM was given — guarantees the "only use my favorites" option is always
+  # honored regardless of whether the LLM actually followed the instruction.
+  def enforce_favorites!(meals, favorite_recipe_ids)
+    meals.each do |meal|
+      allowed = catalog_for_meal_type(meal["meal_type"], favorite_recipe_ids)
+      next if allowed.any? { |dish| dish[:name] == meal["name"] }
 
-    meals.each_with_index do |meal, index|
-      share_kcal = target_kcal * (weights[index] / total_weight)
-      recompute_meal_macros!(meal, share_kcal)
+      replacement = allowed.sample
+      meal["name"] = replacement[:name] if replacement
     end
   end
 
-  def recompute_meal_macros!(meal, share_kcal)
-    base = RecipeCatalog::INDEX[meal["name"]]
-    return unless base
-
-    scale = base[:kcal].zero? ? 1.0 : share_kcal / base[:kcal]
-
-    corrected = {
-      "serving_scale" => scale.round(2),
-      "kcal" => (base[:kcal] * scale).round(1),
-      "protein_g" => (base[:protein_g] * scale).round(1),
-      "carbs_g" => (base[:carbs_g] * scale).round(1),
-      "fat_g" => (base[:fat_g] * scale).round(1)
-    }
-
-    rescale_ingredients!(meal["ingredients"], corrected["kcal"])
-    meal.merge!(corrected)
-  end
-
-  # Proportionally rescales an LLM-invented ingredient list so its macros sum
-  # to the authoritative meal kcal, preserving the LLM's relative proportions
-  # between ingredients (and between an ingredient's own macros) while making
-  # the displayed totals exact.
-  def rescale_ingredients!(ingredients, target_kcal)
-    return if ingredients.blank?
-
-    naive_total = ingredients.sum { |ingredient| ingredient["kcal"].to_f }
-    return if naive_total <= 0
-
-    factor = target_kcal / naive_total
-
-    ingredients.each do |ingredient|
-      ingredient["quantity"] = (ingredient["quantity"].to_f * factor).round(1)
-      ingredient["kcal"] = (ingredient["kcal"].to_f * factor).round(1)
-      ingredient["protein_g"] = (ingredient["protein_g"].to_f * factor).round(1)
-      ingredient["carbs_g"] = (ingredient["carbs_g"].to_f * factor).round(1)
-      ingredient["fat_g"] = (ingredient["fat_g"].to_f * factor).round(1)
+  def catalog_for_meal_type(meal_type, favorite_recipe_ids)
+    case meal_type.to_s
+    when "breakfast" then RecipeCatalog.breakfast_options(recipe_ids: favorite_recipe_ids)
+    when "snack" then RecipeCatalog.snack_options(recipe_ids: favorite_recipe_ids)
+    else RecipeCatalog.recipes(recipe_ids: favorite_recipe_ids)
     end
   end
 
-  def system_prompt
-    catalog_text = RecipeCatalog::RECIPES.map do |dish|
+  def system_prompt(favorite_recipe_ids = nil)
+    catalog_text = RecipeCatalog.recipes(recipe_ids: favorite_recipe_ids).map do |dish|
       "- #{dish[:name]}: #{dish[:kcal]} kcal, #{dish[:protein_g]}g protein, #{dish[:carbs_g]}g carbs, #{dish[:fat_g]}g fat"
     end.join("\n")
 
-    breakfast_text = RecipeCatalog::BREAKFAST_OPTIONS.map do |item|
+    breakfast_text = RecipeCatalog.breakfast_options(recipe_ids: favorite_recipe_ids).map do |item|
       "- #{item[:name]}: #{item[:kcal]} kcal, #{item[:protein_g]}g protein, #{item[:carbs_g]}g carbs, #{item[:fat_g]}g fat, per standard serving"
     end.join("\n")
 
-    snack_text = RecipeCatalog::SNACK_OPTIONS.map do |item|
+    snack_text = RecipeCatalog.snack_options(recipe_ids: favorite_recipe_ids).map do |item|
       "- #{item[:name]}: #{item[:kcal]} kcal, #{item[:protein_g]}g protein, #{item[:carbs_g]}g carbs, #{item[:fat_g]}g fat, per standard serving"
     end.join("\n")
 
@@ -244,16 +222,20 @@ class PreferencesController < ApplicationController
       ## TARGET RULES — CRITICAL
 
       ### Rule 1: The user's stated numbers are LAW
-      - Extract the calorie and macro targets DIRECTLY from the user's message. If the user
-        writes "make a meal at 2300 kcal", the target IS 2300 — never substitute a default
-        like 2000.
-      - If the user gives calories but not macros, compute a sensible split from THAT calorie
-        number (diet-aware, see below), not from a default, and state the split you used in
-        "assumptions".
-      - The profile.target_kcal in the output MUST equal the number the user gave.
-      - If no target is given at all, default to 2000 kcal/day and say so explicitly in
-        "assumptions" — there is no way to ask the user a follow-up question in this app, so you
-        must always produce a full plan in one shot and never leave the target unresolved.
+      - Extract the calorie and macro targets DIRECTLY from the user's message. The calculator
+        form always provides a "Target: X kcal/day" line AND a "Macros: Xg protein, Xg carbs,
+        Xg fat" line — these are computed from the user's real body data (weight, body fat %) in
+        Ruby, not guessed, so use them exactly as given and do not recompute them.
+      - If the user's own notes explicitly state a different target, macro split, or diet that
+        structurally conflicts with the given macros (e.g. "keto" with the given carbs_g too
+        high for keto), their explicit notes override the calculated numbers — but this should be
+        rare, since the calculated macros are the default source of truth.
+      - The profile.target_kcal/protein_g/carbs_g/fat_g in the output MUST equal the numbers given
+        (or the user's explicit override, per above).
+      - If no target/macros are given at all (should not normally happen), default to 2000 kcal/day
+        with a 30/40/30 split and say so explicitly in "assumptions" — there is no way to ask the
+        user a follow-up question in this app, so you must always produce a full plan in one shot
+        and never leave the target unresolved.
 
       ### Rule 2: Meal variety
       - Vary the dishes used across the 7 days — do not repeat the same dish more than twice in
@@ -268,18 +250,9 @@ class PreferencesController < ApplicationController
       add up perfectly; just make them realistic and appropriately proportioned to each other.
 
       ## HANDLING MISSING INFORMATION
-      Apart from calories (Rule 1 above), the user's message may not specify everything else.
-      Never ask a clarifying question — infer a sensible default instead, and record each
-      assumption you made:
-      - Macros not given → split from the calorie target, ADAPTED TO THE DIET TYPE:
-        - Standard diets (omnivore, vegetarian, vegan, pescatarian, balanced, etc.):
-          ~30% protein / 40% carbs / 30% fat.
-        - Low-carb diets (keto): carbs ≈ 5-10% of calories (roughly 20-30g/day), the rest split
-          ~25% protein / ~65-70% fat.
-        - Carnivore diet: carbs ≈ 0 (a carnivore diet has no carb sources at all — do not budget
-          any meaningful carbs for it), split roughly ~35-40% protein / ~60-65% fat.
-        - Never pick a macro split the diet type structurally cannot deliver (e.g. don't set a
-          high carbs_g target for keto/carnivore — there is nothing in those diets to provide it).
+      Apart from calories and macros (Rule 1 above — normally always given by the calculator),
+      the user's message may not specify everything else. Never ask a clarifying question — infer
+      a sensible default instead, and record each assumption you made:
       - Diet type not given → assume omnivore.
       - Allergies/intolerances not mentioned → treat as none.
       - Meals per day not given → assume 3 meals + 1 snack (4 total).
@@ -329,10 +302,9 @@ class PreferencesController < ApplicationController
       - No invented dish names outside these three catalogs.
       - NEVER include any ingredient that conflicts with the user's stated allergies or intolerances. This is a safety rule — no exceptions.
       - Respect the diet type strictly (no meat for vegetarians, etc.).
-      - The "profile" macro targets (protein_g/carbs_g/fat_g) MUST be internally consistent with
-        diet_type — decide them BEFORE writing any meals, using the diet-aware defaults above (or
-        the user's own numbers if given, per Rule 1). Never publish a profile target the diet
-        type cannot realistically supply. See Rules 1-3 above for the exact per-day tolerances.
+      - The "profile" macro targets (protein_g/carbs_g/fat_g) MUST equal the calculated macros
+        given in the user's message (per Rule 1) unless their own notes explicitly override them.
+        See Rules 1-3 above for the exact per-day tolerances.
       - Provide exactly the requested number of meals per day, for all 7 days.
       - Vary meals across the week — do not repeat the same meal more than twice.
       - Use realistic quantities and common ingredients.
