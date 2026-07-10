@@ -7,7 +7,11 @@ Rails.application.routes.draw do
   root to: "pages#home"
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
   get "meal_plans", to: "meal_plans#index", as: :meal_plans
-  resources :preferences, only: [:new, :create]
+  resources :preferences, only: [:new, :create] do
+    collection do
+      post :generate
+    end
+  end
 
   resources :chats, only: [:index, :show] do
     resources :messages, only: [:create] do

@@ -38,7 +38,7 @@ module RecipeCatalog
   end
 
   def self.catalog_for(category, recipe_ids = nil)
-    scope = Recipe.where(category: category)
+    scope = Recipe.where(category: category).includes(:recipe_ingredients)
     scope = scope.where(id: recipe_ids) if recipe_ids.present?
 
     result = scope.order(:name).map(&:as_catalog_hash)
@@ -46,6 +46,6 @@ module RecipeCatalog
 
     # Fallback: the restriction left this category empty — use the full
     # category instead of generating with no options at all.
-    Recipe.where(category: category).order(:name).map(&:as_catalog_hash)
+    Recipe.where(category: category).includes(:recipe_ingredients).order(:name).map(&:as_catalog_hash)
   end
 end

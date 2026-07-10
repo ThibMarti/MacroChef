@@ -16,52 +16,64 @@ module MealPlanMacros
   }.freeze
   DEFAULT_MEAL_TYPE_WEIGHT = 0.20
 
-  def self.allocate_day!(meals, target_kcal)
+  # `recipe_by_name`, when given, is reused as-is instead of being rebuilt —
+  # loading every Recipe (with ingredients) runs a handful of queries, so
+  # doing it fresh for every single meal in a 7-day plan (~28 meals) turns a
+  # cheap lookup into thousands of redundant queries. Callers processing a
+  # whole plan (see PreferencesController#recompute_macros) build it once
+  # upfront via Recipe.includes(:recipe_ingredients).index_by(&:name).
+  def self.allocate_day!(meals, target_kcal, recipe_by_name = nil)
+    recipe_by_name ||= Recipe.includes(:recipe_ingredients).index_by(&:name)
+
     weights = meals.map { |meal| MEAL_TYPE_WEIGHT.fetch(meal["meal_type"], DEFAULT_MEAL_TYPE_WEIGHT) }
     total_weight = weights.sum
     return if total_weight <= 0
 
     meals.each_with_index do |meal, index|
       share_kcal = target_kcal * (weights[index] / total_weight)
-      recompute_meal!(meal, share_kcal)
+      recompute_meal!(meal, share_kcal, recipe_by_name)
     end
   end
 
-  # Recomputes a single meal's macros from RecipeCatalog, scaling the dish's
-  # base (one-serving) macros so its kcal lands on share_kcal, then rescales
-  # the meal's ingredient list proportionally to match. Mutates `meal` and
-  # returns it; no-ops if the dish name isn't in the catalog.
-  def self.recompute_meal!(meal, share_kcal)
-    base = RecipeCatalog.index[meal["name"]]
-    return meal unless base
+  # Recomputes a single meal's macros AND rebuilds its ingredient list
+  # directly from the matching Recipe's real (structured) ingredients,
+  # scaled so the meal's total kcal lands on share_kcal — the LLM's own
+  # invented ingredient list/macros for this meal are discarded entirely.
+  #
+  # We used to keep the LLM's invented ingredients and proportionally
+  # rescale them (by a kcal-based factor) to match the corrected total. That
+  # scaled "quantity" by the same factor as "kcal", which silently corrupted
+  # quantity whenever the LLM's own kcal guess was off (near-universal for
+  # small models) — quantity ends up NOT matching grams-at-the-recipe's-real-
+  # density, so live_macros (which trusts quantity and re-derives kcal from
+  # the recipe's real per-gram rate) would then compute a wildly wrong total.
+  # Building ingredients straight from the recipe like this keeps every
+  # number physically consistent from the start.
+  def self.recompute_meal!(meal, share_kcal, recipe_by_name = nil)
+    recipe = (recipe_by_name || {})[meal["name"]] || Recipe.find_by(name: meal["name"])
+    return meal unless recipe
 
-    # RecipeCatalog values come from the DB as BigDecimal — coerce to Float
-    # so JSON.generate emits plain numbers instead of quoted decimal strings.
-    base_kcal = base[:kcal].to_f
-    scale = base_kcal.zero? ? 1.0 : share_kcal / base_kcal
-
-    corrected = {
-      "serving_scale" => scale.round(2),
-      "kcal" => (base_kcal * scale).round,
-      "protein_g" => (base[:protein_g].to_f * scale).round(1),
-      "carbs_g" => (base[:carbs_g].to_f * scale).round(1),
-      "fat_g" => (base[:fat_g].to_f * scale).round(1)
-    }
-
-    rescale_ingredients!(meal["ingredients"], corrected["kcal"])
-    meal.merge!(corrected)
+    build_scaled_meal!(meal, recipe, share_kcal)
+    meal
   end
 
   # Builds a fresh ingredients array for `meal` from a Recipe's own
   # (structured, user-editable) ingredient list, scaled so the meal's total
   # kcal lands on share_kcal. Used when swapping a meal for a specific
-  # Recipe record (as opposed to recompute_meal!, which works from the
-  # LLM's invented ingredient list and a catalog name).
+  # Recipe record — unlike recompute_meal!, also overwrites "name" (the
+  # dish itself is changing) and clears "steps" (we have no prep steps for
+  # the newly-picked recipe).
   def self.apply_recipe!(meal, recipe, share_kcal)
+    meal["name"] = recipe.name
+    build_scaled_meal!(meal, recipe, share_kcal)
+    meal["steps"] = []
+    meal
+  end
+
+  def self.build_scaled_meal!(meal, recipe, share_kcal)
     base_kcal = recipe.total_kcal.to_f
     scale = base_kcal.zero? ? 1.0 : share_kcal / base_kcal
 
-    meal["name"] = recipe.name
     meal["serving_scale"] = scale.round(2)
     meal["kcal"] = base_kcal.zero? ? 0 : (base_kcal * scale).round
     meal["protein_g"] = (recipe.total_protein_g.to_f * scale).round(1)
@@ -78,9 +90,9 @@ module MealPlanMacros
         "fat_g" => (ingredient.fat_g.to_f * scale).round(1)
       }
     end
-    meal["steps"] = []
     meal
   end
+  private_class_method :build_scaled_meal!
 
   # Returns DISPLAY macros for `meal`, recomputed live from the current
   # Recipe (by name): each ingredient keeps whatever quantity is stored on
@@ -181,24 +193,4 @@ module MealPlanMacros
     )
   end
   private_class_method :apply_rate
-
-  # Proportionally rescales an ingredient list so its macros sum to the
-  # authoritative meal kcal, preserving relative proportions between
-  # ingredients while making the displayed totals exact.
-  def self.rescale_ingredients!(ingredients, target_kcal)
-    return if ingredients.blank?
-
-    naive_total = ingredients.sum { |ingredient| ingredient["kcal"].to_f }
-    return if naive_total <= 0
-
-    factor = target_kcal / naive_total
-
-    ingredients.each do |ingredient|
-      ingredient["quantity"] = (ingredient["quantity"].to_f * factor).round
-      ingredient["kcal"] = (ingredient["kcal"].to_f * factor).round
-      ingredient["protein_g"] = (ingredient["protein_g"].to_f * factor).round(1)
-      ingredient["carbs_g"] = (ingredient["carbs_g"].to_f * factor).round(1)
-      ingredient["fat_g"] = (ingredient["fat_g"].to_f * factor).round(1)
-    end
-  end
 end

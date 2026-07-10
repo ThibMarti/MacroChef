@@ -1,7 +1,5 @@
 <div class="container mt-5">
-  <%= link_to "← Back to MacroChef", root_path, class: "d-inline-block mb-3 text-secondary-mc" %>
   <%= turbo_stream_from @chat %>
-  <h1 class="mc-heading mb-4">MacroChef Chat</h1>
 
   <% @chat.messages.each do |message| %>
     <% plan = meal_plan_payload(message) %>

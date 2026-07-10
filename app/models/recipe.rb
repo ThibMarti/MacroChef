@@ -15,10 +15,15 @@ class Recipe < ApplicationRecord
 
   scope :ordered, -> { order(:category, :name) }
 
-  def total_kcal      = recipe_ingredients.sum(:kcal)
-  def total_protein_g = recipe_ingredients.sum(:protein_g)
-  def total_carbs_g   = recipe_ingredients.sum(:carbs_g)
-  def total_fat_g     = recipe_ingredients.sum(:fat_g)
+  # Ruby-level sum (not `.sum(:kcal)`, a separate SQL aggregate query each
+  # time) — this loads recipe_ingredients ONCE and reuses that loaded array
+  # for all four totals, instead of 4 round-trips per recipe. Matters a lot
+  # here: these are called for every recipe in the catalog, for every meal,
+  # for every day of a plan.
+  def total_kcal      = recipe_ingredients.sum(&:kcal)
+  def total_protein_g = recipe_ingredients.sum(&:protein_g)
+  def total_carbs_g   = recipe_ingredients.sum(&:carbs_g)
+  def total_fat_g     = recipe_ingredients.sum(&:fat_g)
 
   # Shape consumed by RecipeCatalog / SearchRecipesTool / the meal-plan
   # generator — kept identical to the old hardcoded-array format so nothing
