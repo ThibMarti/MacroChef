@@ -32,8 +32,9 @@ class PreferencesController < ApplicationController
     carbs_g = params[:carbs_g].to_i
     fat_g = params[:fat_g].to_i
     target_kcal = (protein_g * 4) + (carbs_g * 4) + (fat_g * 9)
+    recurring = recurring_recipes(p)
 
-    @preference = Preference.new(content: build_content(p, target_kcal, protein_g, carbs_g, fat_g))
+    @preference = Preference.new(content: build_content(p, target_kcal, protein_g, carbs_g, fat_g, recurring))
     @preference.user = current_user
 
     if @preference.save
@@ -41,16 +42,10 @@ class PreferencesController < ApplicationController
 
       user_prompt = @preference.content
       favorite_recipe_ids = p[:only_favorites] == "1" ? current_user.favorite_recipes.ids : nil
-      recurring = recurring_recipes(p)
-
-      ruby_llm_chat = RubyLLM.chat(model: "gpt-4o-mini")
-
-      response = ruby_llm_chat
-                 .with_instructions(system_prompt(favorite_recipe_ids, recurring))
-                 .ask(user_prompt)
+      plan_json = ask_llm_for_plan(user_prompt, favorite_recipe_ids, recurring)
 
       @chat.messages.create!(role: "user", content: user_prompt)
-      @chat.messages.create!(role: "assistant", content: recompute_macros(response.content, favorite_recipe_ids, recurring))
+      @chat.messages.create!(role: "assistant", content: recompute_macros(plan_json, favorite_recipe_ids, recurring))
 
       redirect_to chat_path(@chat)
     else
@@ -59,6 +54,26 @@ class PreferencesController < ApplicationController
   end
 
   private
+
+  # Calls the LLM for a plan, retrying once if the response isn't valid
+  # JSON with a "week" array — small models occasionally emit slightly
+  # malformed JSON (stray comma, unescaped character, etc.), especially for
+  # larger plans (5+ meals/day). Returns whichever attempt's raw content
+  # looked valid, or the last attempt if both failed (recompute_macros
+  # degrades gracefully either way, but this makes success the common case).
+  def ask_llm_for_plan(user_prompt, favorite_recipe_ids, recurring)
+    2.times do |attempt|
+      ruby_llm_chat = RubyLLM.chat(model: "gpt-4o-mini")
+      response = ruby_llm_chat
+                 .with_instructions(system_prompt(favorite_recipe_ids, recurring))
+                 .ask(user_prompt)
+
+      parsed = JSON.parse(response.content) rescue nil
+      return response.content if parsed.is_a?(Hash) && parsed["week"].is_a?(Array)
+
+      return response.content if attempt == 1
+    end
+  end
 
   def calculator_params
     params.require(:preference).permit(
@@ -148,7 +163,13 @@ class PreferencesController < ApplicationController
 
   # Formats the final (possibly user-edited) target/macros plus the rest of
   # the calculator inputs into the plain-text description sent to the LLM.
-  def build_content(p, target_kcal, protein_g, carbs_g, fat_g)
+  # If the user pinned a "Snack 2" recurring meal, explicitly tells the LLM
+  # to include 2 snacks/day — otherwise the default (1 snack/day, see
+  # system_prompt) would leave that second recurring pick with no slot to
+  # ever land in.
+  def build_content(p, target_kcal, protein_g, carbs_g, fat_g, recurring = {})
+    snack_count = recurring["snack"].is_a?(Array) ? recurring["snack"].compact.count : 0
+
     <<~TEXT
       Target: #{target_kcal} kcal/day (already calculated from body data — use this exact number, do not recalculate it).
       Macros: #{protein_g}g protein, #{carbs_g}g carbs, #{fat_g}g fat (already calculated from body data — use
@@ -156,6 +177,7 @@ class PreferencesController < ApplicationController
       Gender: #{p[:gender]}. Weight: #{p[:weight_kg]}kg. Body fat: #{p[:body_fat_percent]}%.
       Daily steps: #{p[:steps_per_day]}. Training: #{p[:training_type].presence || "none"}, #{p[:training_minutes]} min/session, #{p[:training_days_per_week]} sessions/week.
       Goal: #{p[:goal].presence || "maintain"}.
+      #{"Include exactly #{snack_count} snacks per day (not the default 1) IN ADDITION TO breakfast, lunch, and dinner — never drop breakfast/lunch/dinner to make room for extra snacks. The user has #{snack_count} recurring snack slots configured." if snack_count > 1}
       #{p[:extra_notes].presence}
     TEXT
   end
@@ -200,6 +222,8 @@ class PreferencesController < ApplicationController
       meals = Array(day["meals"])
       apply_recurring_meals!(meals, recurring) if recurring.present?
       enforce_favorites!(meals, favorite_recipe_ids, favorites_catalog_cache) if favorite_recipe_ids.present?
+      ensure_core_meals!(meals, recurring, recipe_by_name)
+      reorder_meals!(meals)
       MealPlanMacros.allocate_day!(meals, target_kcal, recipe_by_name) if meals.any?
     end
 
@@ -230,6 +254,83 @@ class PreferencesController < ApplicationController
       recipe = pick.is_a?(Array) ? pick[index] : (pick if index.zero?)
       meal["name"] = recipe.name if recipe
     end
+
+    # The LLM sometimes still only generates 1 snack/day despite the
+    # "include N snacks" instruction in the user prompt (small models don't
+    # reliably honor prompt instructions) — if a recurring slot has no meal
+    # to land in, add it directly rather than silently losing that pin.
+    recurring.each do |meal_type, pick|
+      next unless pick.is_a?(Array)
+
+      pick.each_with_index do |recipe, index|
+        next unless recipe
+        next if index < occurrence[meal_type]
+
+        meals << { "meal_type" => meal_type, "name" => recipe.name, "ingredients" => [], "steps" => [] }
+      end
+    end
+
+    # Conversely, trim any EXTRA meals of a recurring meal_type beyond the
+    # configured count — the LLM sometimes adds more than requested despite
+    # the explicit "include exactly N snacks" instruction. The first
+    # `expected` occurrences are already correctly pinned above, so it's
+    # always the trailing extras that get dropped.
+    recurring.each do |meal_type, pick|
+      next unless pick.is_a?(Array)
+
+      expected = pick.compact.count
+      seen = 0
+      meals.reject! do |meal|
+        next false unless meal["meal_type"] == meal_type
+
+        seen += 1
+        seen > expected
+      end
+    end
+  end
+
+  # Guarantees breakfast/lunch/dinner each appear at least once per day —
+  # small models sometimes drop one of the core meals (e.g. swap dinner out
+  # to make room for an extra snack) despite the prompt saying not to.
+  # Missing slots are filled with the user's recurring pick for that
+  # meal_type if configured, otherwise the first catalog recipe available.
+  def ensure_core_meals!(meals, recurring, recipe_by_name)
+    %w[breakfast lunch dinner].each do |meal_type|
+      next if meals.any? { |meal| meal["meal_type"] == meal_type }
+
+      pick = recurring[meal_type]
+      recipe = pick.is_a?(Recipe) ? pick : fallback_recipe_for(meal_type, recipe_by_name)
+      next unless recipe
+
+      meals << { "meal_type" => meal_type, "name" => recipe.name, "ingredients" => [], "steps" => [] }
+    end
+  end
+
+  def fallback_recipe_for(meal_type, recipe_by_name)
+    category = meal_type == "breakfast" ? "breakfast" : "main"
+    recipe_by_name.values.find { |recipe| recipe.category == category }
+  end
+
+  # Reorders a day's meals into a fixed, predictable sequence: Breakfast,
+  # (1st) Snack, Lunch, (2nd) Snack, Dinner — any further meals (extra
+  # snacks etc.) are appended after, in their original relative order.
+  def reorder_meals!(meals)
+    snacks_seen = 0
+    keyed = meals.map do |meal|
+      key = case meal["meal_type"]
+            when "breakfast" then 0
+            when "snack"
+              position = snacks_seen < 2 ? [1, 3][snacks_seen] : 10 + snacks_seen
+              snacks_seen += 1
+              position
+            when "lunch" then 2
+            when "dinner" then 4
+            else 20
+            end
+      [key, meal]
+    end
+
+    meals.replace(keyed.sort_by(&:first).map(&:last))
   end
 
   # Replaces any meal whose dish isn't in the user's favorites (for that
@@ -257,13 +358,19 @@ class PreferencesController < ApplicationController
   end
 
   def system_prompt(favorite_recipe_ids = nil, recurring = {})
+    # IMPORTANT: never write a compound label like "snack #1" here — models
+    # have previously copied that whole string into the JSON "meal_type"
+    # field verbatim (producing "snack #1" instead of "snack"), corrupting
+    # the plan. "meal_type" must ALWAYS be exactly "snack" for these.
     recurring_text = recurring.flat_map do |meal_type, pick|
       if pick.is_a?(Array)
+        ordinals = ["1st", "2nd", "3rd", "4th"]
         pick.each_with_index.filter_map do |recipe, index|
-          "- #{meal_type} ##{index + 1}: always \"#{recipe.name}\"" if recipe
+          "- The #{ordinals[index] || "#{index + 1}th"} \"#{meal_type}\" meal_type of the day: always \"#{recipe.name}\" " \
+            "(the JSON \"meal_type\" field must still be exactly \"#{meal_type}\", not anything else)" if recipe
         end
       else
-        ["- #{meal_type}: always \"#{pick.name}\""]
+        ["- Every \"#{meal_type}\" meal_type: always \"#{pick.name}\""]
       end
     end.join("\n")
 
