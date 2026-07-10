@@ -99,6 +99,11 @@
         <%= hidden_field_tag "preference[goal]", @calculator_params[:goal] %>
         <%= hidden_field_tag "preference[extra_notes]", @calculator_params[:extra_notes] %>
         <%= hidden_field_tag "preference[only_favorites]", @calculator_params[:only_favorites] %>
+        <%= hidden_field_tag "preference[recurring_breakfast_id]", @calculator_params[:recurring_breakfast_id] %>
+        <%= hidden_field_tag "preference[recurring_lunch_id]", @calculator_params[:recurring_lunch_id] %>
+        <%= hidden_field_tag "preference[recurring_dinner_id]", @calculator_params[:recurring_dinner_id] %>
+        <%= hidden_field_tag "preference[recurring_snack_1_id]", @calculator_params[:recurring_snack_1_id] %>
+        <%= hidden_field_tag "preference[recurring_snack_2_id]", @calculator_params[:recurring_snack_2_id] %>
 
         <div class="d-flex gap-2">
           <%= link_to "← Back", new_preference_path, class: "btn btn-outline-secondary" %>
