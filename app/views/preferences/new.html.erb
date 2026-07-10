@@ -88,12 +88,40 @@
                     placeholder="Example: vegetarian, no peanuts, 4 meals per day, easy recipes."></textarea>
         </div>
 
-        <div class="mc-surface p-4 mb-4">
+        <div class="mc-surface p-4 mb-3">
           <div class="form-check">
             <input type="checkbox" class="form-check-input" name="preference[only_favorites]" value="1" id="only_favorites">
             <label class="form-check-label" for="only_favorites">
               Only use my favorite recipes (♥ on the <%= link_to "Recipes", recipes_path %> page)
             </label>
+          </div>
+        </div>
+
+        <div class="mc-surface p-4 mb-4">
+          <h2 class="mc-heading h6 mb-1">Recurring meals</h2>
+          <p class="text-secondary-mc small mb-3">
+            Lock a specific recipe to a meal of the day — it'll be used every day of the week
+            instead of varying. Leave on "No preference" to let MacroChef choose.
+          </p>
+
+          <div class="row g-3">
+            <% [
+                 ["breakfast", "recurring_breakfast_id", "Breakfast"],
+                 ["lunch", "recurring_lunch_id", "Lunch"],
+                 ["dinner", "recurring_dinner_id", "Dinner"],
+                 ["snack", "recurring_snack_1_id", "Snack 1"],
+                 ["snack", "recurring_snack_2_id", "Snack 2"]
+               ].each do |meal_type, field, label| %>
+              <div class="col-6">
+                <label class="form-label" for="<%= field %>"><%= label %></label>
+                <select class="form-select" name="preference[<%= field %>]" id="<%= field %>">
+                  <option value="">No preference</option>
+                  <% recurring_meal_options(meal_type).each do |recipe| %>
+                    <option value="<%= recipe.id %>"><%= recipe.name %></option>
+                  <% end %>
+                </select>
+              </div>
+            <% end %>
           </div>
         </div>
 

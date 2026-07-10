@@ -41,15 +41,16 @@ class PreferencesController < ApplicationController
 
       user_prompt = @preference.content
       favorite_recipe_ids = p[:only_favorites] == "1" ? current_user.favorite_recipes.ids : nil
+      recurring = recurring_recipes(p)
 
       ruby_llm_chat = RubyLLM.chat(model: "gpt-4o-mini")
 
       response = ruby_llm_chat
-                 .with_instructions(system_prompt(favorite_recipe_ids))
+                 .with_instructions(system_prompt(favorite_recipe_ids, recurring))
                  .ask(user_prompt)
 
       @chat.messages.create!(role: "user", content: user_prompt)
-      @chat.messages.create!(role: "assistant", content: recompute_macros(response.content, favorite_recipe_ids))
+      @chat.messages.create!(role: "assistant", content: recompute_macros(response.content, favorite_recipe_ids, recurring))
 
       redirect_to chat_path(@chat)
     else
@@ -63,8 +64,28 @@ class PreferencesController < ApplicationController
     params.require(:preference).permit(
       :gender, :weight_kg, :body_fat_percent, :steps_per_day,
       :training_type, :training_minutes, :training_days_per_week,
-      :goal, :extra_notes, :only_favorites
+      :goal, :extra_notes, :only_favorites,
+      :recurring_breakfast_id, :recurring_lunch_id, :recurring_dinner_id,
+      :recurring_snack_1_id, :recurring_snack_2_id
     )
+  end
+
+  # Builds { "breakfast" => Recipe, "lunch" => Recipe, "dinner" => Recipe,
+  # "snack" => [Recipe, Recipe] } from whichever recurring_*_id fields the
+  # user filled in — meal types with no selection are absent from the hash.
+  # Snack is a list (not a single Recipe) since a day can have more than one
+  # snack slot: apply_recurring_meals! matches list position to the Nth
+  # snack of the day (Snack 1 -> first snack meal, Snack 2 -> second).
+  def recurring_recipes(p)
+    recurring = %w[breakfast lunch dinner].filter_map do |meal_type|
+      recipe = Recipe.find_by(id: p[:"recurring_#{meal_type}_id"])
+      [meal_type, recipe] if recipe
+    end.to_h
+
+    snacks = [p[:recurring_snack_1_id], p[:recurring_snack_2_id]].map { |id| Recipe.find_by(id: id) }
+    recurring["snack"] = snacks if snacks.any?
+
+    recurring
   end
 
   # MET (Metabolic Equivalent of Task) values used to estimate calories
@@ -159,8 +180,11 @@ class PreferencesController < ApplicationController
   # When favorite_recipe_ids is given, also enforces the "only favorites"
   # restriction ourselves (see enforce_favorites!) rather than trusting the
   # LLM to have honored it — small models sometimes pick a dish outside the
-  # given catalog anyway despite the prompt's hard constraint.
-  def recompute_macros(raw_content, favorite_recipe_ids = nil)
+  # given catalog anyway despite the prompt's hard constraint. Likewise,
+  # `recurring` ({ "breakfast" => Recipe, ... }) forces every meal of that
+  # meal_type, every day, to be that exact recipe — same "never trust the
+  # LLM to honor a prompt instruction, enforce it in Ruby" pattern.
+  def recompute_macros(raw_content, favorite_recipe_ids = nil, recurring = {})
     parsed = JSON.parse(raw_content)
     return raw_content unless parsed.is_a?(Hash) && parsed["week"].is_a?(Array)
 
@@ -174,6 +198,7 @@ class PreferencesController < ApplicationController
 
     parsed["week"].each do |day|
       meals = Array(day["meals"])
+      apply_recurring_meals!(meals, recurring) if recurring.present?
       enforce_favorites!(meals, favorite_recipe_ids, favorites_catalog_cache) if favorite_recipe_ids.present?
       MealPlanMacros.allocate_day!(meals, target_kcal, recipe_by_name) if meals.any?
     end
@@ -181,6 +206,30 @@ class PreferencesController < ApplicationController
     JSON.generate(parsed)
   rescue JSON::ParserError
     raw_content
+  end
+
+  # Forces every meal whose meal_type has a recurring pick (e.g. "always
+  # Rice Pudding for breakfast") to that exact recipe's name, regardless of
+  # what the LLM chose — the actual macros/ingredients get (re)built from it
+  # afterward by MealPlanMacros.allocate_day!, same as any other meal.
+  #
+  # breakfast/lunch/dinner map to a single Recipe (applies to the first meal
+  # of that type in the day). snack maps to a list — position N applies to
+  # the Nth snack of the day (Snack 1 -> first snack, Snack 2 -> second), so
+  # each snack slot can be pinned independently; a nil entry means "no
+  # preference for that slot" and leaves the LLM's choice alone.
+  def apply_recurring_meals!(meals, recurring)
+    occurrence = Hash.new(0)
+
+    meals.each do |meal|
+      meal_type = meal["meal_type"]
+      index = occurrence[meal_type]
+      occurrence[meal_type] += 1
+
+      pick = recurring[meal_type]
+      recipe = pick.is_a?(Array) ? pick[index] : (pick if index.zero?)
+      meal["name"] = recipe.name if recipe
+    end
   end
 
   # Replaces any meal whose dish isn't in the user's favorites (for that
@@ -207,7 +256,17 @@ class PreferencesController < ApplicationController
     end
   end
 
-  def system_prompt(favorite_recipe_ids = nil)
+  def system_prompt(favorite_recipe_ids = nil, recurring = {})
+    recurring_text = recurring.flat_map do |meal_type, pick|
+      if pick.is_a?(Array)
+        pick.each_with_index.filter_map do |recipe, index|
+          "- #{meal_type} ##{index + 1}: always \"#{recipe.name}\"" if recipe
+        end
+      else
+        ["- #{meal_type}: always \"#{pick.name}\""]
+      end
+    end.join("\n")
+
     catalog_text = RecipeCatalog.recipes(recipe_ids: favorite_recipe_ids).map do |dish|
       "- #{dish[:name]}: #{dish[:kcal]} kcal, #{dish[:protein_g]}g protein, #{dish[:carbs_g]}g carbs, #{dish[:fat_g]}g fat"
     end.join("\n")
@@ -238,6 +297,7 @@ class PreferencesController < ApplicationController
       kcal/protein_g/carbs_g/fat_g values you write for a meal are placeholders that get
       overwritten — don't spend effort computing them precisely.
 
+      #{"## RECURRING MEALS — CRITICAL CONSTRAINT\nThe user has locked these meal_types to always use the same dish, every day of the week — use exactly this dish for every meal of that meal_type, all 7 days (still fill in a plausible ingredient list per Rule 3 below):\n\n#{recurring_text}\n" if recurring_text.present?}
       ## RECIPE CATALOG — CRITICAL CONSTRAINT
       Every meal_type "lunch" or "dinner" MUST be one of the dishes below (exact "name", no
       renaming, no invented dishes):
